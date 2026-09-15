@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CheckerX Arena</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0; padding: 0;
+            background: linear-gradient(135deg, #1e1e2f, #11111d);
+            color: #fff; font-family: 'Poppins', sans-serif;
+            text-align: center;
+        }
+        .header { display: flex; justify-content: space-between; padding: 15px; }
+        .avatar { width: 45px; height: 45px; border-radius: 50%; border: 2px solid #00f2fe; }
+        .balance-box { background: rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 20px; font-weight: bold; }
+        
+        .screen { display: none; padding: 20px; }
+        .active { display: block; }
+
+        .play-btn, .action-btn {
+            background: linear-gradient(45deg, #00c6ff, #0072ff);
+            border: none; color: #fff; padding: 15px 40px;
+            font-size: 18px; border-radius: 30px; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,198,255,0.4); margin-top: 20px;
+        }
+
+        .stake-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
+        .stake-card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px solid #333; cursor: pointer; }
+        .stake-card.selected { border-color: #00f2fe; background: rgba(0,242,254,0.2); }
+
+        canvas { border: 4px solid #333; border-radius: 8px; margin-top: 10px; }
+        .flipped { transform: rotate(180deg); } /* Board rotation logic */
+
+        /* Win/Loss Modal */
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); justify-content: center; align-items: center; flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Navigation Header -->
+    <div class="header">
+        <img src="https://via.placeholder.com/45" class="avatar" alt="Profile">
+        <div class="balance-box">💰 <span id="userBalance">100</span> Coins</div>
+    </div>
+
+    <!-- 1. Home Page Screen -->
+    <div id="homeScreen" class="screen active">
+        <h1>CheckerX Arena</h1>
+        <p>Real-Time Skill Based Checkers</p>
+        <button class="play-btn" onclick="showScreen('stakeScreen')">▶ PLAY NOW</button>
+        <br><br>
+        <button class="action-btn" style="background: #333;" onclick="alert('📜 Rules:\n1. Standard Checkers rules apply.\n2. Win takes 180% of stake pool.\n3. Turn limit: 30s.')">📜 Game Rules</button>
+    </div>
+
+    <!-- 2. Stake Amount Selection Screen -->
+    <div id="stakeScreen" class="screen">
+        <h2>Select Stake Amount</h2>
+        <div class="stake-grid">
+            <div class="stake-card" onclick="selectStake(10, this)">10 Coins</div>
+            <div class="stake-card" onclick="selectStake(50, this)">50 Coins</div>
+            <div class="stake-card" onclick="selectStake(100, this)">100 Coins</div>
+            <div class="stake-card" onclick="selectStake(500, this)">500 Coins</div>
+        </div>
+        <button class="play-btn" onclick="startGame()">Start Match</button>
+        <br><br>
+        <button class="action-btn" style="background: #555;" onclick="showScreen('homeScreen')">⬅ Back to Main Menu</button>
+    </div>
+
+    <!-- 3. Game Board Screen -->
+    <div id="gameScreen" class="screen">
+        <canvas id="checkersBoard" width="320" height="320"></canvas>
+    </div>
+
+    <!-- Win/Loss Dynamic Modal -->
+    <div id="gameModal" class="modal">
+        <h1 id="modalTitle">Victory! 🎉</h1>
+        <p id="modalDesc">You won 180 X Coins</p>
+        <button class="play-btn" onclick="showScreen('stakeScreen'); closeModal();">⬅ Back to Stakes</button>
+    </div>
+
+    <script>
+        let selectedStakeAmount = 0;
+        let playerColor = 'black'; // Red හෝ Black (Server එකෙන් Assign වන එක)
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function selectStake(amount, element) {
+            selectedStakeAmount = amount;
+            document.querySelectorAll('.stake-card').forEach(c => c.classList.remove('selected'));
+            element.classList.add('selected');
+        }
+
+        function startGame() {
+            if (selectedStakeAmount === 0) return alert('Please select a stake amount!');
+            showScreen('gameScreen');
+            initBoard();
+        }
+
+        function initBoard() {
+            const canvas = document.getElementById('checkersBoard');
+            const ctx = canvas.getContext('2d');
+            
+            // Player Black නම් Board එක Auto-Rotate කිරීම
+            if (playerColor === 'black') {
+                canvas.classList.add('flipped');
+            } else {
+                canvas.classList.remove('flipped');
+            }
+
+            // Draw Simple Checkers Grid
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    ctx.fillStyle = (r + c) % 2 === 0 ? '#eeeed2' : '#769656';
+                    ctx.fillRect(c * 40, r * 40, 40, 40);
+                }
+            }
+        }
+
+        function endGame(isWin, reward) {
+            const modal = document.getElementById('gameModal');
+            document.getElementById('modalTitle').innerText = isWin ? "VICTORY! 🎉" : "DEFEAT 💔";
+            document.getElementById('modalDesc').innerText = isWin ? `You won ${reward} X Coins!` : "Better luck next time!";
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('gameModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
