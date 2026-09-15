@@ -5,7 +5,9 @@ const { Server } = require('socket.io');
 const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_ID = "8739780042";
+const ADMIN_ID = "8739780042"; // ඔයාගේ ID එක
+const DEPOSIT_CHANNEL_ID = "@your_deposit_channel";
+const WITHDRAW_CHANNEL_ID = "@your_withdraw_channel";
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing!");
@@ -23,20 +25,21 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Pro In-Memory Database
+// Database
 const users = {}; 
 
 function getUser(id, name) {
     const userId = id || 'guest';
     if (!users[userId]) {
         const initialBalance = (String(userId) === ADMIN_ID) ? 1000000 : 100;
-        users[userId] = { id: userId, name: name || 'Player', balance: initialBalance };
+        users[userId] = { id: userId, name: name || 'Player', balance: initialBalance, referredBy: null };
     } else if (name) {
         users[userId].name = name;
     }
     return users[userId];
 }
 
+// ---- TELEGRAM BOT COMMANDS ----
 bot.start((ctx) => {
     const user = getUser(ctx.from.id, ctx.from.first_name);
     const welcomeMsg = `👋 **Welcome to CheckerX Arena!** 🎮\n\n💰 **Your Balance:** ${user.balance.toLocaleString()} X Coins ($${(user.balance/100).toFixed(2)})`;
@@ -57,14 +60,65 @@ bot.hears('🎮 Play CheckerX', (ctx) => {
     ctx.reply('👇 Click the blue **Play CheckerX** button at bottom left to play!');
 });
 
+bot.hears('📥 Deposit', (ctx) => {
+    ctx.reply('📥 **Select Your Preferred Deposit Method:**', Markup.inlineKeyboard([
+        [Markup.button.callback('Binance Pay', 'dep_binance')],
+        [Markup.button.callback('USDT (TRC20)', 'dep_usdt')]
+    ]));
+});
+
+bot.action(/dep_(.+)/, (ctx) => {
+    const method = ctx.match[1].toUpperCase();
+    ctx.replyWithMarkdown(`📥 **Deposit via ${method}**\n\nPlease send your payment to Admin and type:\n\`/submit_deposit <TxID>\``);
+});
+
+bot.command('submit_deposit', (ctx) => {
+    const txId = ctx.message.text.split(' ')[1];
+    if (!txId) return ctx.reply("❌ Please provide TxID! Example: `/submit_deposit 1234567`");
+    ctx.reply("✅ Your deposit request has been submitted to Admin!");
+});
+
+bot.hears('📤 Withdrawal', (ctx) => {
+    ctx.reply("📤 To withdraw, use format: `/withdraw <Address> <Amount>`");
+});
+
+bot.command('withdraw', (ctx) => {
+    const user = getUser(ctx.from.id);
+    const args = ctx.message.text.split(' ');
+    const amount = parseFloat(args[2]);
+    if (!args[1] || !amount || amount > user.balance) return ctx.reply("❌ Invalid amount or insufficient balance!");
+    user.balance -= amount;
+    ctx.reply("✅ Withdrawal request submitted successfully!");
+});
+
+bot.hears('🔗 Referral', (ctx) => {
+    const user = getUser(ctx.from.id);
+    ctx.reply(`🔗 **Your Referral Link:**\nhttps://t.me/CheckerX_Bot?start=${user.id}`);
+});
+
+bot.hears('💬 Customer Support', (ctx) => {
+    ctx.reply('💬 **Contact Admin:** @YourPersonalTelegramUsername');
+});
+
+bot.command('addcoins', (ctx) => {
+    if (String(ctx.from.id) !== ADMIN_ID) return;
+    const args = ctx.message.text.split(' ');
+    const targetId = args[1];
+    const amount = parseFloat(args[2]);
+    if (users[targetId]) {
+        users[targetId].balance += amount;
+        bot.telegram.sendMessage(targetId, `🎉 ${amount} X Coins added to your wallet!`);
+        ctx.reply(`✅ Added ${amount} coins to ${targetId}`);
+    }
+});
+
 bot.launch();
 
-// --- Bulletproof Matchmaking ---
+// ---- SOCKET MATCHMAKING & ECONOMY ----
 const waitingPlayers = [];
 const activeRooms = {};
 
 io.on('connection', (socket) => {
-
     socket.on('init_user', (userData) => {
         try {
             if (!userData || !userData.id) return;
@@ -72,62 +126,48 @@ io.on('connection', (socket) => {
             socket.userId = user.id;
             socket.userName = user.name;
             socket.emit('user_synced', { balance: user.balance, name: user.name });
-        } catch (e) { console.error("Init Error:", e); }
+        } catch (e) { console.error(e); }
     });
 
     socket.on('find_match', (data) => {
         try {
             const uid = socket.userId || (data && data.userId) || 'guest';
-            socket.userId = uid; // Ensure ID is attached
+            socket.userId = uid;
             socket.userName = socket.userName || 'Player';
-            
             const user = getUser(uid, socket.userName);
 
             if (user.balance < 100) {
                 return socket.emit('error_message', 'Insufficient Balance! Please deposit coins to play.');
             }
 
-            socket.stake = 100;
-
             if (waitingPlayers.length > 0 && waitingPlayers[0].id !== socket.id) {
                 const opponent = waitingPlayers.shift();
                 const roomId = `room_${socket.id}_${opponent.id}`;
 
-                socket.join(roomId);
-                opponent.join(roomId);
-
-                socket.roomId = roomId;
-                opponent.roomId = roomId;
-
+                socket.join(roomId); opponent.join(roomId);
+                socket.roomId = roomId; opponent.roomId = roomId;
                 activeRooms[roomId] = { p1: socket, p2: opponent, turn: 'red' };
 
-                // 💰 Safe Deduction
-                const u1 = getUser(socket.userId);
-                const u2 = getUser(opponent.userId);
-                u1.balance -= 100;
-                u2.balance -= 100;
-
-                socket.emit('user_synced', { balance: u1.balance, name: u1.name });
-                opponent.emit('user_synced', { balance: u2.balance, name: u2.name });
+                // 💰 Deduct Coins Live!
+                users[socket.userId].balance -= 100;
+                users[opponent.userId].balance -= 100;
+                
+                socket.emit('user_synced', { balance: users[socket.userId].balance, name: users[socket.userId].name });
+                opponent.emit('user_synced', { balance: users[opponent.userId].balance, name: users[opponent.userId].name });
 
                 socket.emit('match_found', { role: 'red', opponentName: opponent.userName, roomId });
                 opponent.emit('match_found', { role: 'black', opponentName: socket.userName, roomId });
             } else {
-                // Prevent duplicate waiting entries
-                if (!waitingPlayers.find(p => p.id === socket.id)) {
-                    waitingPlayers.push(socket);
-                }
+                if (!waitingPlayers.find(p => p.id === socket.id)) waitingPlayers.push(socket);
             }
-        } catch (e) { console.error("Matchmaking Error:", e); }
+        } catch (e) { console.error(e); }
     });
 
     socket.on('make_move', (moveData) => {
-        try {
-            if (socket.roomId && activeRooms[socket.roomId]) {
-                activeRooms[socket.roomId].turn = moveData.nextTurn;
-                socket.to(socket.roomId).emit('opponent_moved', moveData);
-            }
-        } catch (e) { console.error("Move Error:", e); }
+        if (socket.roomId && activeRooms[socket.roomId]) {
+            activeRooms[socket.roomId].turn = moveData.nextTurn;
+            socket.to(socket.roomId).emit('opponent_moved', moveData);
+        }
     });
 
     socket.on('pass_turn', (data) => {
@@ -137,16 +177,13 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🏆 Safe Reward Distribution
-    function handleWin(winnerSocket, loserSocket, isTimeoutOrDisconnect = false) {
+    // 🏆 Reward Winner
+    function handleWin(winnerSocket, loserSocket, eventName) {
         if (!winnerSocket || !winnerSocket.userId) return;
         const winner = getUser(winnerSocket.userId);
         winner.balance += 180;
         winnerSocket.emit('user_synced', { balance: winner.balance, name: winner.name });
-        
-        if (loserSocket && isTimeoutOrDisconnect) {
-            winnerSocket.emit(isTimeoutOrDisconnect); // Send specific event
-        }
+        if (loserSocket && eventName) winnerSocket.emit(eventName);
     }
 
     socket.on('game_won', () => {
@@ -187,4 +224,4 @@ io.on('connection', (socket) => {
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => console.log(`Pro CheckerX Server on ${port}`));
+server.listen(port, () => console.log(`Server Running on port ${port}`));
