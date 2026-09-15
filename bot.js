@@ -163,10 +163,9 @@ bot.command('addcoins', (ctx) => {
 });
 
 // Open Web App Button Logic
+// Open Web App Notice Logic (Inline Button නැතුව Standard Text එකක් විතරක් යැවීම)
 bot.hears('🎮 Play CheckerX', (ctx) => {
-    ctx.reply('👇 Click below to enter the CheckerX Arena!', Markup.inlineKeyboard([
-        [Markup.button.webApp('🚀 Launch Game', MINI_APP_URL)]
-    ]));
+    ctx.reply('👇 Click the blue **Play CheckerX** button at the bottom left to enter the Arena!');
 });
 
 bot.launch();
