@@ -16,13 +16,15 @@
         .active-screen { display: flex; flex-direction: column; align-items: center; }
         .btn-primary { background: linear-gradient(135deg, #00c6ff, #0072ff); color: #fff; border: none; padding: 14px 32px; font-size: 16px; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 85%; }
         .btn-secondary { background: #161b22; color: #c9d1d9; border: 1px solid #30363d; padding: 12px 24px; font-size: 14px; border-radius: 10px; cursor: pointer; margin-top: 10px; width: 85%; }
-        .stake-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; margin: 20px 0; }
-        .stake-card { background: #161b22; border: 2px solid #30363d; padding: 18px; border-radius: 12px; font-weight: bold; cursor: pointer; color: #00f2fe; }
-        .stake-card.active-stake { border-color: #00f2fe; background: rgba(0, 242, 254, 0.15); }
+        .stake-box { background: #161b22; border: 2px solid #00f2fe; padding: 20px; border-radius: 14px; width: 85%; margin: 20px 0; color: #00f2fe; font-size: 20px; font-weight: bold; box-shadow: 0 0 15px rgba(0,242,254,0.2); }
         .loader { border: 4px solid #161b22; border-top: 4px solid #00f2fe; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px 0; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         canvas { border: 4px solid #30363d; border-radius: 12px; cursor: pointer; }
         .rotate-board { transform: rotate(180deg); }
+        .timer-container { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .timer-circle { width: 42px; height: 42px; border-radius: 50%; border: 3px solid #00f2fe; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; color: #00f2fe; transition: 0.3s; }
+        .timer-danger { border-color: #ff4757 !important; color: #ff4757 !important; animation: pulse 0.5s infinite alternate; }
+        @keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
         .modal-content { background: #161b22; border: 1px solid #30363d; padding: 25px; border-radius: 16px; width: 90%; max-width: 360px; text-align: center; }
     </style>
@@ -39,42 +41,56 @@
 
     <div id="homeScreen" class="screen active-screen">
         <h1 style="color: #00f2fe;">CheckerX Arena</h1>
-        <p style="color: #8b949e; font-size: 14px;">Brazilian Rules Checkers</p>
+        <p style="color: #8b949e; font-size: 14px;">1 vs 1 Live Checkers Match</p>
         <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 PLAY GAME</button>
         <button class="btn-secondary" onclick="openRulesModal()">📜 Rules</button>
     </div>
 
     <div id="stakeScreen" class="screen">
-        <h3>Select Stake Amount</h3>
-        <div class="stake-grid">
-            <div class="stake-card" onclick="setStake(10, this)">10 Coins</div>
-            <div class="stake-card" onclick="setStake(50, this)">50 Coins</div>
-            <div class="stake-card" onclick="setStake(100, this)">100 Coins</div>
-            <div class="stake-card" onclick="setStake(500, this)">500 Coins</div>
-        </div>
+        <h3>Match Stake</h3>
+        <div class="stake-box">💰 100 X Coins ($1.00)</div>
         <button class="btn-primary" onclick="startMatchmaking()">FIND MATCH</button>
-        <button class="btn-secondary" onclick="navTo('homeScreen')">⬅ Back</button>
+        <button class="btn-secondary" onclick="navTo('homeScreen')">⬅ Back to Menu</button>
     </div>
 
     <div id="waitingScreen" class="screen">
         <h2>Searching Opponent...</h2>
         <div class="loader"></div>
-        <p>Waiting for player on <span id="waitingStake" style="color:#00f2fe;">0</span> Stake</p>
+        <p>Searching live player for <span style="color:#00f2fe; font-weight:bold;">100 X Coins</span> Stake</p>
         <button class="btn-secondary" style="background:#8b0000;" onclick="cancelMatchmaking()">Cancel</button>
     </div>
 
     <div id="gameScreen" class="screen">
-        <div id="statusText" style="color:#00f2fe; font-weight:bold; margin-bottom:10px;">Your Turn</div>
+        <div class="timer-container">
+            <div id="statusText" style="color:#00f2fe; font-weight:bold;">Your Turn</div>
+            <div id="timerCircle" class="timer-circle">30</div>
+        </div>
         <canvas id="checkersCanvas" width="320" height="320"></canvas>
+    </div>
+
+    <div id="warnModal" class="modal">
+        <div class="modal-content" style="border-color: #e67e22;">
+            <h3 style="color: #e67e22;">⚠️ TIME OUT WARNING!</h3>
+            <p style="color: #c9d1d9; font-size: 14px;">You missed your turn! If you miss one more turn, you will lose the match!</p>
+            <button class="btn-primary" style="background:#e67e22;" onclick="closeWarnModal()">I Understand</button>
+        </div>
+    </div>
+
+    <div id="gameEndModal" class="modal">
+        <div class="modal-content">
+            <h1 id="endResultTitle" style="color: #00f2fe; margin-bottom:5px;">VICTORY! 🎉</h1>
+            <p id="endResultDesc" style="color: #c9d1d9;">You won 180 X Coins</p>
+            <button class="btn-primary" onclick="navTo('homeScreen'); closeEndModal();">🏠 Back to Main Menu</button>
+        </div>
     </div>
 
     <div id="rulesModal" class="modal">
         <div class="modal-content">
             <h3 style="color: #00f2fe;">🇧🇷 Brazilian Checkers Rules</h3>
             <p style="text-align: left; font-size: 13px; color: #c9d1d9; line-height: 1.6;">
-                1. <b>Mandatory Captures:</b> Jumps are forced! If a capture move is available, normal moves are disabled.<br>
-                2. <b>Backward Captures:</b> Men pieces can capture both forward and backward.<br>
-                3. <b>King Ability 👑:</b> Kings can fly across open diagonals, but when capturing, they land immediately behind the captured piece.
+                1. <b>Multi-Jump & Majority:</b> If captures are available, you must take them. Majority capture path is strictly forced.<br>
+                2. <b>Kings 👑:</b> Flying capability with immediate landing behind captured piece.<br>
+                3. <b>30s Turn Clock:</b> Missing 2 turns causes auto-loss!
             </p>
             <button class="btn-secondary" onclick="closeRulesModal()">Close</button>
         </div>
@@ -88,7 +104,6 @@
         let tgUser = tg?.initDataUnsafe?.user || { id: 8739780042, first_name: 'TestUser' };
         let userBalance = 0;
 
-        let currentStake = 0;
         let myRole = ''; 
         let currentTurn = 'red';
         const tileSize = 40;
@@ -96,10 +111,13 @@
         let selectedPiece = null;
         let legalMoves = [];
 
+        let timeLeft = 30;
+        let timerInterval = null;
+        let timeOutCount = 0;
+
         const canvas = document.getElementById('checkersCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Authenticate with Telegram details
         socket.emit('init_user', tgUser);
 
         socket.on('user_synced', (data) => {
@@ -108,31 +126,22 @@
             document.getElementById('userName').innerText = data.name;
         });
 
-        socket.on('error_message', (msg) => {
-            alert(msg);
-        });
+        socket.on('error_message', (msg) => alert(msg));
 
         function navTo(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
             document.getElementById(id).classList.add('active-screen');
         }
 
-        function setStake(amount, el) {
-            currentStake = amount;
-            document.querySelectorAll('.stake-card').forEach(c => c.classList.remove('active-stake'));
-            el.classList.add('active-stake');
-        }
-
         function openRulesModal() { document.getElementById('rulesModal').style.display = 'flex'; }
         function closeRulesModal() { document.getElementById('rulesModal').style.display = 'none'; }
+        function closeWarnModal() { document.getElementById('warnModal').style.display = 'none'; }
+        function closeEndModal() { document.getElementById('gameEndModal').style.display = 'none'; clearInterval(timerInterval); }
 
         function startMatchmaking() {
-            if (currentStake === 0) return alert('Select a stake amount!');
-            if (userBalance < currentStake) return alert('Insufficient Balance! Please deposit coins to play.');
-            
-            document.getElementById('waitingStake').innerText = currentStake;
+            if (userBalance < 100) return alert('Insufficient Balance! Please deposit coins to play.');
             navTo('waitingScreen');
-            socket.emit('find_match', { stake: currentStake, userId: tgUser.id });
+            socket.emit('find_match', { userId: tgUser.id });
         }
 
         function cancelMatchmaking() {
@@ -142,28 +151,86 @@
 
         socket.on('match_found', (data) => {
             myRole = data.role;
+            timeOutCount = 0;
             navTo('gameScreen');
             setupInitialBoard();
             renderBoard();
-            updateTurnStatus();
+            startTurnTimer();
         });
 
         socket.on('opponent_moved', (data) => {
             boardState[data.to.r][data.to.c] = boardState[data.from.r][data.from.c];
             boardState[data.from.r][data.from.c] = null;
-            if (data.captured) {
-                boardState[data.captured.r][data.captured.c] = null;
+            if (data.capturedSequence) {
+                data.capturedSequence.forEach(cap => { boardState[cap.r][cap.c] = null; });
             }
-            if (data.promoted) {
-                boardState[data.to.r][data.to.c].isKing = true;
-            }
+            if (data.promoted) boardState[data.to.r][data.to.c].isKing = true;
+
             currentTurn = myRole;
             renderBoard();
-            updateTurnStatus();
+            startTurnTimer();
         });
 
-        function updateTurnStatus() {
-            document.getElementById('statusText').innerText = (currentTurn === myRole) ? "🟢 Your Turn!" : "⏳ Opponent's Turn...";
+        socket.on('opponent_disconnected', () => {
+            showEndGame(true, "Opponent Disconnected! You Win 180 X Coins! 🎉");
+        });
+
+        socket.on('opponent_timed_out', () => {
+            showEndGame(true, "Opponent Missed Turns! You Win 180 X Coins! 🎉");
+        });
+
+        function startTurnTimer() {
+            clearInterval(timerInterval);
+            timeLeft = 30;
+            updateTimerUI();
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerUI();
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTurnTimeout();
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            const timerEl = document.getElementById('timerCircle');
+            const statusEl = document.getElementById('statusText');
+            timerEl.innerText = timeLeft;
+
+            if (currentTurn === myRole) {
+                statusEl.innerText = "🟢 Your Turn!";
+                if (timeLeft <= 5) timerEl.classList.add('timer-danger');
+                else timerEl.classList.remove('timer-danger');
+            } else {
+                statusEl.innerText = "⏳ Opponent's Turn...";
+                timerEl.classList.remove('timer-danger');
+            }
+        }
+
+        function handleTurnTimeout() {
+            if (currentTurn === myRole) {
+                timeOutCount++;
+                if (timeOutCount === 1) {
+                    document.getElementById('warnModal').style.display = 'flex';
+                    currentTurn = (myRole === 'red') ? 'black' : 'red';
+                    startTurnTimer();
+                } else if (timeOutCount >= 2) {
+                    socket.emit('timeout_loss');
+                    showEndGame(false, "Match Lost! You missed 2 turns in a row. ❌");
+                }
+            }
+        }
+
+        function showEndGame(isWin, desc) {
+            clearInterval(timerInterval);
+            const title = document.getElementById('endResultTitle');
+            title.innerText = isWin ? "VICTORY! 🎉" : "DEFEAT ❌";
+            title.style.color = isWin ? "#00f2fe" : "#ff4757";
+            document.getElementById('endResultDesc').innerText = desc;
+            document.getElementById('gameEndModal').style.display = 'flex';
         }
 
         function setupInitialBoard() {
@@ -219,80 +286,122 @@
             }
         }
 
-        // Brazilian Moves Engine Logic
-        function getAllCapturesForRole(color) {
-            let allCaptures = [];
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    let p = boardState[r][c];
-                    if (p && p.color === color) {
-                        let caps = getPieceCaptures(r, c);
-                        if (caps.length > 0) {
-                            allCaptures.push({ from: { r, c }, moves: caps });
-                        }
-                    }
-                }
-            }
-            return allCaptures;
-        }
-
-        function getPieceCaptures(r, c) {
-            let p = boardState[r][c];
-            let captures = [];
+        function getCapturesForPiece(r, c, board, p, visitedCaptures = []) {
+            let possiblePaths = [];
             let dirs = [[-1,-1], [-1,1], [1,-1], [1,1]];
 
             if (!p.isKing) {
-                // Regular Man captures (forward & backward)
                 dirs.forEach(([dr, dc]) => {
                     let mr = r + dr, mc = c + dc;
                     let lr = r + dr * 2, lc = c + dc * 2;
+
                     if (lr >= 0 && lr < 8 && lc >= 0 && lc < 8) {
-                        if (boardState[mr][mc] && boardState[mr][mc].color !== p.color && !boardState[lr][lc]) {
-                            captures.push({ r: lr, c: lc, captured: { r: mr, c: mc } });
+                        let alreadyCaptured = visitedCaptures.some(v => v.r === mr && v.c === mc);
+                        if (board[mr][mc] && board[mr][mc].color !== p.color && !alreadyCaptured && !board[lr][lc]) {
+                            let nextBoard = JSON.parse(JSON.stringify(board));
+                            nextBoard[lr][lc] = nextBoard[r][c];
+                            nextBoard[r][c] = null;
+
+                            let nextVisited = [...visitedCaptures, { r: mr, c: mc }];
+                            let subPaths = getCapturesForPiece(lr, lc, nextBoard, p, nextVisited);
+
+                            if (subPaths.length > 0) {
+                                subPaths.forEach(sub => {
+                                    possiblePaths.push({
+                                        r: lr, c: lc,
+                                        capturedSequence: [{ r: mr, c: mc }, ...sub.capturedSequence]
+                                    });
+                                });
+                            } else {
+                                possiblePaths.push({
+                                    r: lr, c: lc,
+                                    capturedSequence: [{ r: mr, c: mc }]
+                                });
+                            }
                         }
                     }
                 });
             } else {
-                // King captures: Flying diagonally, but landing IMMEDIATELY behind the captured piece
                 dirs.forEach(([dr, dc]) => {
                     let step = 1;
                     while (true) {
-                        let mr = r + dr * step;
-                        let mc = c + dc * step;
+                        let mr = r + dr * step, mc = c + dc * step;
                         if (mr < 0 || mr >= 8 || mc < 0 || mc >= 8) break;
 
-                        if (boardState[mr][mc]) {
-                            if (boardState[mr][mc].color !== p.color) {
-                                // Landing spot immediately behind enemy piece
-                                let lr = mr + dr;
-                                let lc = mc + dc;
-                                if (lr >= 0 && lr < 8 && lc >= 0 && lc < 8 && !boardState[lr][lc]) {
-                                    captures.push({ r: lr, c: lc, captured: { r: mr, c: mc } });
+                        if (board[mr][mc]) {
+                            let alreadyCaptured = visitedCaptures.some(v => v.r === mr && v.c === mc);
+                            if (board[mr][mc].color !== p.color && !alreadyCaptured) {
+                                let landingStep = 1;
+                                while (true) {
+                                    let lr = mr + dr * landingStep, lc = mc + dc * landingStep;
+                                    if (lr < 0 || lr >= 8 || lc < 0 || lc >= 8 || board[lr][lc]) break;
+
+                                    let nextBoard = JSON.parse(JSON.stringify(board));
+                                    nextBoard[lr][lc] = nextBoard[r][c];
+                                    nextBoard[r][c] = null;
+
+                                    let nextVisited = [...visitedCaptures, { r: mr, c: mc }];
+                                    let subPaths = getCapturesForPiece(lr, lc, nextBoard, p, nextVisited);
+
+                                    if (subPaths.length > 0) {
+                                        subPaths.forEach(sub => {
+                                            possiblePaths.push({
+                                                r: lr, c: lc,
+                                                capturedSequence: [{ r: mr, c: mc }, ...sub.capturedSequence]
+                                            });
+                                        });
+                                    } else {
+                                        possiblePaths.push({
+                                            r: lr, c: lc,
+                                            capturedSequence: [{ r: mr, c: mc }]
+                                        });
+                                    }
+                                    landingStep++;
                                 }
                             }
-                            break; // Stop scanning this line after meeting a piece
+                            break;
                         }
                         step++;
                     }
                 });
             }
-            return captures;
+            return possiblePaths;
         }
 
         function calculateMoves(r, c) {
             legalMoves = [];
-            let p = boardState[r][c];
-            let allCaptures = getAllCapturesForRole(p.color);
+            let allPlayerCaptures = [];
 
-            if (allCaptures.length > 0) {
-                // Mandatory Jumps Rule
-                let pieceCap = allCaptures.find(ac => ac.from.r === r && ac.from.c === c);
-                if (pieceCap) {
-                    legalMoves = pieceCap.moves;
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    let piece = boardState[row][col];
+                    if (piece && piece.color === myRole) {
+                        let paths = getCapturesForPiece(row, col, boardState, piece);
+                        paths.forEach(p => {
+                            allPlayerCaptures.push({
+                                from: { r: row, c: col },
+                                to: { r: p.r, c: p.c },
+                                count: p.capturedSequence.length,
+                                capturedSequence: p.capturedSequence
+                            });
+                        });
+                    }
                 }
+            }
+
+            if (allPlayerCaptures.length > 0) {
+                let maxCaptures = Math.max(...allPlayerCaptures.map(c => c.count));
+                let maxCaptureMoves = allPlayerCaptures.filter(c => c.count === maxCaptures && c.from.r === r && c.from.c === c);
+
+                legalMoves = maxCaptureMoves.map(m => ({
+                    r: m.to.r,
+                    c: m.to.c,
+                    capturedSequence: m.capturedSequence
+                }));
             } else {
-                // Normal Moves
+                let p = boardState[r][c];
                 let dirs = p.isKing ? [[-1,-1], [-1,1], [1,-1], [1,1]] : (p.color === 'red' ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]]);
+
                 dirs.forEach(([dr, dc]) => {
                     if (!p.isKing) {
                         let nr = r + dr, nc = c + dc;
@@ -300,11 +409,9 @@
                             legalMoves.push({ r: nr, c: nc });
                         }
                     } else {
-                        // Flying King Normal Move
                         let step = 1;
                         while (true) {
-                            let nr = r + dr * step;
-                            let nc = c + dc * step;
+                            let nr = r + dr * step, nc = c + dc * step;
                             if (nr < 0 || nr >= 8 || nc < 0 || nc >= 8 || boardState[nr][nc]) break;
                             legalMoves.push({ r: nr, c: nc });
                             step++;
@@ -332,23 +439,22 @@
                     boardState[r][c] = boardState[selectedPiece.r][selectedPiece.c];
                     boardState[selectedPiece.r][selectedPiece.c] = null;
 
-                    if (move.captured) {
-                        boardState[move.captured.r][move.captured.c] = null;
+                    if (move.capturedSequence) {
+                        move.capturedSequence.forEach(cap => { boardState[cap.r][cap.c] = null; });
                     }
 
-                    // Promotion
                     if ((boardState[r][c].color === 'red' && r === 0) || (boardState[r][c].color === 'black' && r === 7)) {
                         boardState[r][c].isKing = true;
                         promoted = true;
                     }
 
-                    socket.emit('make_move', { from: selectedPiece, to: { r, c }, captured: move.captured, promoted });
+                    socket.emit('make_move', { from: selectedPiece, to: { r, c }, capturedSequence: move.capturedSequence, promoted });
 
                     selectedPiece = null;
                     legalMoves = [];
                     currentTurn = (myRole === 'red') ? 'black' : 'red';
                     renderBoard();
-                    updateTurnStatus();
+                    startTurnTimer();
                     return;
                 }
             }

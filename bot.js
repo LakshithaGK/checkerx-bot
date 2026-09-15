@@ -23,12 +23,10 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Simple In-Memory User Database
 const users = {}; 
 
 function getUser(id, name) {
     if (!users[id]) {
-        // ඔයාගේ Admin Telegram ID එක නම් (8739780042) Coins 1,000,000 ලබා දීම
         const initialBalance = (String(id) === ADMIN_ID) ? 1000000 : 100;
         users[id] = { id: id, name: name || 'Player', balance: initialBalance };
     } else if (name) {
@@ -37,10 +35,9 @@ function getUser(id, name) {
     return users[id];
 }
 
-// Bot Commands
 bot.start((ctx) => {
     const user = getUser(ctx.from.id, ctx.from.first_name);
-    const welcomeMsg = `👋 **Welcome to CheckerX Arena!** 🎮\n\n💰 **Your Balance:** ${user.balance.toLocaleString()} X Coins`;
+    const welcomeMsg = `👋 **Welcome to CheckerX Arena!** 🎮\n\n💰 **Your Balance:** ${user.balance.toLocaleString()} X Coins ($${(user.balance/100).toFixed(2)})`;
     const mainMenu = Markup.keyboard([
         ['🎮 Play CheckerX', '💰 Balance'],
         ['📥 Deposit', '📤 Withdrawal'],
@@ -60,12 +57,11 @@ bot.hears('🎮 Play CheckerX', (ctx) => {
 
 bot.launch();
 
-// ---------------- Real-time Matchmaking & Socket Logic ----------------
 const waitingPlayers = [];
+const activeRooms = {};
 
 io.on('connection', (socket) => {
 
-    // Authenticate Telegram User & Sync Balance
     socket.on('init_user', (userData) => {
         if (!userData || !userData.id) return;
         const user = getUser(userData.id, userData.first_name);
@@ -74,21 +70,18 @@ io.on('connection', (socket) => {
         socket.emit('user_synced', { balance: user.balance, name: user.name });
     });
 
-    // Find Match
     socket.on('find_match', (data) => {
         const userId = socket.userId || data.userId || 'guest';
         const user = users[userId] || { balance: 100, name: 'Player' };
 
-        if (user.balance < data.stake) {
+        if (user.balance < 100) {
             return socket.emit('error_message', 'Insufficient Balance! Please deposit coins to play.');
         }
 
-        socket.stake = data.stake;
+        socket.stake = 100;
 
-        const opponentIndex = waitingPlayers.findIndex(p => p.stake === data.stake && p.id !== socket.id);
-
-        if (opponentIndex !== -1) {
-            const opponent = waitingPlayers.splice(opponentIndex, 1)[0];
+        if (waitingPlayers.length > 0 && waitingPlayers[0].id !== socket.id) {
+            const opponent = waitingPlayers.shift();
             const roomId = `room_${socket.id}_${opponent.id}`;
 
             socket.join(roomId);
@@ -96,6 +89,12 @@ io.on('connection', (socket) => {
 
             socket.roomId = roomId;
             opponent.roomId = roomId;
+
+            activeRooms[roomId] = {
+                p1: socket,
+                p2: opponent,
+                turn: 'red'
+            };
 
             socket.emit('match_found', { role: 'red', opponentName: opponent.userName || 'Opponent', roomId });
             opponent.emit('match_found', { role: 'black', opponentName: socket.userName || 'Opponent', roomId });
@@ -110,6 +109,13 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('timeout_loss', () => {
+        if (socket.roomId && activeRooms[socket.roomId]) {
+            socket.to(socket.roomId).emit('opponent_timed_out');
+            delete activeRooms[socket.roomId];
+        }
+    });
+
     socket.on('cancel_search', () => {
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) waitingPlayers.splice(index, 1);
@@ -118,10 +124,13 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) waitingPlayers.splice(index, 1);
+
+        if (socket.roomId && activeRooms[socket.roomId]) {
+            socket.to(socket.roomId).emit('opponent_disconnected');
+            delete activeRooms[socket.roomId];
+        }
     });
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => {
-    console.log(`CheckerX Socket Server running on port ${port}`);
-});
+server.listen(port, () => console.log(`CheckerX Running on port ${port}`));
