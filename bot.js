@@ -28,3 +28,12 @@ http.createServer((req, res) => {
 }).listen(port, () => {
     console.log(`Port binding server running on port ${port}`);
 });
+const http = require('http');
+const port = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('CheckerX Bot is Running Successfully!\n');
+}).listen(port, () => {
+    console.log(`Port binding server running on port ${port}`);
+});
