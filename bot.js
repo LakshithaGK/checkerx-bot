@@ -1,22 +1,15 @@
-const { Telegraf, Markup } = require('telegraf');
+const { Telegraf } = require('telegraf');
 const http = require('http');
 
 // Initialize Telegram Bot with Token
 const bot = new Telegraf('8872491990:AAFHWz6LMI-UjhOVqGf1nPJZY-XtOrT52DE'); // ඔයාගේ Bot Token එක මෙතැනට දාන්න
 
-// Mini App Render URL
-const MINI_APP_URL = 'https://checkerx-bot.onrender.com';
-
 bot.start((ctx) => {
     const welcomeMessage = `👋 **Welcome to CheckerX!** 🎮\n\n` +
         `Play real-time skill-based Checkers games, earn X Coins, and climb the leaderboard! 🏆\n\n` +
-        `👇 Click the button below to start playing now!`;
+        `👇 Click the **Play CheckerX** button below to start playing!`;
 
-    return ctx.replyWithMarkdown(welcomeMessage, 
-        Markup.inlineKeyboard([
-            [Markup.button.webApp('🎮 Play CheckerX Now', MINI_APP_URL)]
-        ])
-    );
+    return ctx.replyWithMarkdown(welcomeMessage);
 });
 
 console.log('CheckerX Bot is running...');
