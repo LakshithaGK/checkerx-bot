@@ -6,7 +6,7 @@ const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = "8739780042"; // ඔයාගේ ID එක
-const MATCH_LOG_CHANNEL_ID = "https://t.me/+afxcxB06aI5lMmNl"; // 🔴 ඔයාගේ Private Match Results Channel ID එක මෙතනට දෙන්න
+const MATCH_LOG_CHANNEL_ID = "-1004321776706"; // 🔴 ඔයාගේ Private Match Results Channel ID එක මෙතනට දෙන්න
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing!");
