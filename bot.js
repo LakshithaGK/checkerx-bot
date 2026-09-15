@@ -5,9 +5,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_ID = "8739780042"; // ඔයාගේ ID එක
-const DEPOSIT_CHANNEL_ID = "@your_deposit_channel";
-const WITHDRAW_CHANNEL_ID = "@your_withdraw_channel";
+const ADMIN_ID = "8739780042";
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing!");
@@ -21,11 +19,8 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// Database
 const users = {}; 
 
 function getUser(id, name) {
@@ -39,7 +34,6 @@ function getUser(id, name) {
     return users[userId];
 }
 
-// ---- TELEGRAM BOT COMMANDS ----
 bot.start((ctx) => {
     const user = getUser(ctx.from.id, ctx.from.first_name);
     const welcomeMsg = `👋 **Welcome to CheckerX Arena!** 🎮\n\n💰 **Your Balance:** ${user.balance.toLocaleString()} X Coins ($${(user.balance/100).toFixed(2)})`;
@@ -55,66 +49,25 @@ bot.hears('💰 Balance', (ctx) => {
     const user = getUser(ctx.from.id, ctx.from.first_name);
     ctx.reply(`💳 **Your Balance:** ${user.balance.toLocaleString()} X Coins`);
 });
-
-bot.hears('🎮 Play CheckerX', (ctx) => {
-    ctx.reply('👇 Click the blue **Play CheckerX** button at bottom left to play!');
-});
-
-bot.hears('📥 Deposit', (ctx) => {
-    ctx.reply('📥 **Select Your Preferred Deposit Method:**', Markup.inlineKeyboard([
-        [Markup.button.callback('Binance Pay', 'dep_binance')],
-        [Markup.button.callback('USDT (TRC20)', 'dep_usdt')]
-    ]));
-});
-
-bot.action(/dep_(.+)/, (ctx) => {
-    const method = ctx.match[1].toUpperCase();
-    ctx.replyWithMarkdown(`📥 **Deposit via ${method}**\n\nPlease send your payment to Admin and type:\n\`/submit_deposit <TxID>\``);
-});
-
-bot.command('submit_deposit', (ctx) => {
-    const txId = ctx.message.text.split(' ')[1];
-    if (!txId) return ctx.reply("❌ Please provide TxID! Example: `/submit_deposit 1234567`");
-    ctx.reply("✅ Your deposit request has been submitted to Admin!");
-});
-
-bot.hears('📤 Withdrawal', (ctx) => {
-    ctx.reply("📤 To withdraw, use format: `/withdraw <Address> <Amount>`");
-});
-
-bot.command('withdraw', (ctx) => {
-    const user = getUser(ctx.from.id);
-    const args = ctx.message.text.split(' ');
-    const amount = parseFloat(args[2]);
-    if (!args[1] || !amount || amount > user.balance) return ctx.reply("❌ Invalid amount or insufficient balance!");
-    user.balance -= amount;
-    ctx.reply("✅ Withdrawal request submitted successfully!");
-});
-
-bot.hears('🔗 Referral', (ctx) => {
-    const user = getUser(ctx.from.id);
-    ctx.reply(`🔗 **Your Referral Link:**\nhttps://t.me/CheckerX_Bot?start=${user.id}`);
-});
-
-bot.hears('💬 Customer Support', (ctx) => {
-    ctx.reply('💬 **Contact Admin:** @YourPersonalTelegramUsername');
-});
-
+bot.hears('🎮 Play CheckerX', (ctx) => ctx.reply('👇 Click the blue **Play CheckerX** button at bottom left to play!'));
+bot.hears('📥 Deposit', (ctx) => ctx.reply('📥 **Deposit via:**\n1. Binance Pay\n2. USDT (TRC20)\n\nSend payment to Admin & use `/submit_deposit <TxID>`'));
+bot.command('submit_deposit', (ctx) => ctx.reply("✅ Deposit request submitted!"));
+bot.hears('📤 Withdrawal', (ctx) => ctx.reply("📤 Format: `/withdraw <Address> <Amount>`"));
+bot.command('withdraw', (ctx) => ctx.reply("✅ Withdrawal submitted!"));
+bot.hears('🔗 Referral', (ctx) => ctx.reply(`🔗 **Your Referral Link:**\nhttps://t.me/CheckerX_Bot?start=${ctx.from.id}`));
+bot.hears('💬 Customer Support', (ctx) => ctx.reply('💬 **Contact Admin:** @YourPersonalTelegramUsername'));
 bot.command('addcoins', (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
-    const targetId = args[1];
-    const amount = parseFloat(args[2]);
-    if (users[targetId]) {
-        users[targetId].balance += amount;
-        bot.telegram.sendMessage(targetId, `🎉 ${amount} X Coins added to your wallet!`);
-        ctx.reply(`✅ Added ${amount} coins to ${targetId}`);
+    if (users[args[1]]) {
+        users[args[1]].balance += parseFloat(args[2]);
+        bot.telegram.sendMessage(args[1], `🎉 ${args[2]} X Coins added!`);
+        ctx.reply(`✅ Added!`);
     }
 });
 
 bot.launch();
 
-// ---- SOCKET MATCHMAKING & ECONOMY ----
 const waitingPlayers = [];
 const activeRooms = {};
 
@@ -136,9 +89,7 @@ io.on('connection', (socket) => {
             socket.userName = socket.userName || 'Player';
             const user = getUser(uid, socket.userName);
 
-            if (user.balance < 100) {
-                return socket.emit('error_message', 'Insufficient Balance! Please deposit coins to play.');
-            }
+            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
 
             if (waitingPlayers.length > 0 && waitingPlayers[0].id !== socket.id) {
                 const opponent = waitingPlayers.shift();
@@ -148,7 +99,6 @@ io.on('connection', (socket) => {
                 socket.roomId = roomId; opponent.roomId = roomId;
                 activeRooms[roomId] = { p1: socket, p2: opponent, turn: 'red' };
 
-                // 💰 Deduct Coins Live!
                 users[socket.userId].balance -= 100;
                 users[opponent.userId].balance -= 100;
                 
@@ -177,11 +127,10 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🏆 Reward Winner
     function handleWin(winnerSocket, loserSocket, eventName) {
         if (!winnerSocket || !winnerSocket.userId) return;
         const winner = getUser(winnerSocket.userId);
-        winner.balance += 180;
+        winner.balance += 180; // 80% Profit, 20 Network fee
         winnerSocket.emit('user_synced', { balance: winner.balance, name: winner.name });
         if (loserSocket && eventName) winnerSocket.emit(eventName);
     }
