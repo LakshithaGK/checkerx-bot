@@ -5,8 +5,8 @@ const { Server } = require('socket.io');
 const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_ID = "8739780042"; // ඔයාගේ ID එක
-const MATCH_LOG_CHANNEL_ID = "-1004321776706"; // 🔴 ඔයාගේ Private Match Results Channel ID එක මෙතනට දෙන්න
+const ADMIN_ID = "8739780042"; // ඔයාගේ Admin ID එක
+const MATCH_LOG_CHANNEL_ID = "-1004321776706"; // 🔴 ඔයාගේ Private Channel ID එක
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing!");
@@ -66,15 +66,20 @@ bot.command('addcoins', (ctx) => {
     }
 });
 
-bot.launch();
+// 🛡️ Crash-Proof Bot Launch
+bot.launch().then(() => {
+    console.log("Telegraf Bot successfully launched!");
+}).catch((err) => {
+    console.error("Telegraf Launch Warning (Server will stay alive):", err.message);
+});
 
 const waitingPlayers = [];
 const activeRooms = {};
-let onlineUsersCount = 0; // 🟢 Active Users Tracker
+let onlineUsersCount = 0; 
 
 io.on('connection', (socket) => {
     onlineUsersCount++;
-    io.emit('online_count', onlineUsersCount); // Update all clients
+    io.emit('online_count', onlineUsersCount); 
 
     socket.on('init_user', (userData) => {
         try {
@@ -139,11 +144,14 @@ io.on('connection', (socket) => {
         winnerSocket.emit('user_synced', { balance: winner.balance, name: winner.name });
         if (loserSocket && eventName) winnerSocket.emit(eventName);
 
-        // 🟢 Send Match Logs to Private Channel
+        // 🟢 Channel Logging
         if (loserSocket && loserSocket.userId) {
             const loser = getUser(loserSocket.userId);
-            const logMsg = `🏆 **Match Finished**\n\n🟢 **Winner:** ${winner.name} (\`${winner.id}\`)\n🔴 **Loser:** ${loser.name} (\`${loser.id}\`)\nℹ️ **Reason:** ${reason}`;
-            bot.telegram.sendMessage(MATCH_LOG_CHANNEL_ID, logMsg).catch(e => console.log("Log error (Check if Bot is admin in channel):", e.message));
+            const logMsg = `🏆 *Match Finished*\n\n🟢 *Winner:* ${winner.name} (\`${winner.id}\`)\n🔴 *Loser:* ${loser.name} (\`${loser.id}\`)\nℹ️ *Reason:* ${reason}`;
+            
+            bot.telegram.sendMessage(MATCH_LOG_CHANNEL_ID, logMsg, { parse_mode: 'Markdown' }).catch(e => {
+                console.log("Channel Message Error (Verify bot admin status):", e.message);
+            });
         }
     }
 
@@ -173,7 +181,7 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         onlineUsersCount--;
-        io.emit('online_count', onlineUsersCount); // Update counter for all clients
+        io.emit('online_count', onlineUsersCount); 
 
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) waitingPlayers.splice(index, 1);
@@ -181,11 +189,11 @@ io.on('connection', (socket) => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
-            handleWin(winnerSocket, socket, 'opponent_disconnected', "Opponent Disconnected");
+            handleWin(winnerSocket, socket, 'opponent_disconnected', "Opponent Disconnected / Left Match");
             delete activeRooms[socket.roomId];
         }
     });
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => console.log(`Server Running on port ${port}`));
+server.listen(port, () => console.log(`CheckerX Server running on port ${port}`));
