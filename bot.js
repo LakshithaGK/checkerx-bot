@@ -1,11 +1,11 @@
 const { Telegraf, Markup } = require('telegraf');
-const http = require('http');
+const express = require('express');
+const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = "YOUR_TELEGRAM_USER_ID"; // ඔයාගේ Telegram User ID එක මෙතැනට දාන්න
-const DEPOSIT_CHANNEL_ID = "@your_deposit_channel"; // Deposit Request එන Channel ID එක
-const WITHDRAW_CHANNEL_ID = "@your_withdraw_channel"; // Withdraw Request එන Channel ID එක
-const MINI_APP_URL = 'https://checkerx-bot.onrender.com';
+const DEPOSIT_CHANNEL_ID = "@your_deposit_channel";
+const WITHDRAW_CHANNEL_ID = "@your_withdraw_channel";
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing!");
@@ -13,8 +13,16 @@ if (!BOT_TOKEN) {
 }
 
 const bot = new Telegraf(BOT_TOKEN);
+const app = express();
 
-// Simple In-Memory Database (Real DB එකක් නැති නිසා)
+// Public Folder එකෙන් index.html (Game UI) එක Web App එකක් විදිහට Serve කිරීම
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Simple In-Memory Database
 const users = {}; 
 
 function getUser(ctx) {
@@ -31,18 +39,17 @@ function getUser(ctx) {
     return users[id];
 }
 
-// 1. /start Command & Main Keyboard
+// 1. /start Command
 bot.start((ctx) => {
     const user = getUser(ctx);
     
-    // Referral Track Logic
     const startPayload = ctx.startPayload;
     if (startPayload && !user.referredBy && startPayload != user.id) {
         user.referredBy = startPayload;
     }
 
     const welcomeMsg = `👋 **Welcome to CheckerX Ecosystem!** 🎮\n\n` +
-        ` Play skill-based Checkers games, earn X Coins, and instantly withdraw!\n\n` +
+        `Play skill-based Checkers games, earn X Coins, and instantly withdraw!\n\n` +
         `👤 **Name:** ${user.name}\n` +
         `💰 **Balance:** ${user.balance} X Coins`;
 
@@ -72,10 +79,10 @@ bot.hears('📥 Deposit', (ctx) => {
 
 bot.action(/dep_(.+)/, (ctx) => {
     const method = ctx.match[1].toUpperCase();
-    const adminAddress = "YOUR_CRYPTO_WALLET_ADDRESS_HERE"; // ඔයාගේ Binance/TRC20 Address එක
+    const adminAddress = "YOUR_CRYPTO_WALLET_ADDRESS_HERE";
 
     ctx.replyWithMarkdown(`📥 **Deposit via ${method}**\n\n` +
-        ` Please send your payment to the following address:\n\n` +
+        `Please send your payment to the following address:\n\n` +
         `\`${adminAddress}\`\n\n` +
         `⚠️ **Instructions:**\n` +
         `1. Send payment.\n` +
@@ -83,7 +90,7 @@ bot.action(/dep_(.+)/, (ctx) => {
         `Format: \`/submit_deposit <TxID>\``);
 });
 
-// 4. Submit Deposit Request to Admin Channel
+// 4. Submit Deposit Request
 bot.command('submit_deposit', (ctx) => {
     const user = getUser(ctx);
     const txId = ctx.message.text.split(' ')[1];
@@ -125,7 +132,7 @@ bot.command('withdraw', (ctx) => {
     ctx.reply("✅ Withdrawal request submitted successfully!");
 });
 
-// 6. Referral Link & Commission
+// 6. Referral Link
 bot.hears('🔗 Referral', (ctx) => {
     const user = getUser(ctx);
     const refLink = `https://t.me/CheckerX_Bot?start=${user.id}`;
@@ -137,7 +144,7 @@ bot.hears('💬 Customer Support', (ctx) => {
     ctx.reply('💬 **Customer Support:**\n\n👤 Direct Admin: @YourPersonalTelegramUsername\n🤖 Support Bot: @YourSupportBotUsername');
 });
 
-// 8. Admin Add Coins Command
+// 8. Admin Add Coins
 bot.command('addcoins', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
@@ -147,11 +154,10 @@ bot.command('addcoins', (ctx) => {
     if (users[targetId]) {
         users[targetId].balance += amount;
 
-        // Referral bonus allocation
         if (!users[targetId].hasDeposited && users[targetId].referredBy) {
             const referrer = users[users[targetId].referredBy];
             if (referrer) {
-                referrer.balance += 10; // 10 Coins commission
+                referrer.balance += 10;
                 bot.telegram.sendMessage(referrer.id, "🎉 You earned 10 X Coins referral bonus!");
             }
             users[targetId].hasDeposited = true;
@@ -162,17 +168,18 @@ bot.command('addcoins', (ctx) => {
     }
 });
 
-// Open Web App Button Logic
-// Open Web App Notice Logic (Inline Button නැතුව Standard Text එකක් විතරක් යැවීම)
+// Play Notice
 bot.hears('🎮 Play CheckerX', (ctx) => {
     ctx.reply('👇 Click the blue **Play CheckerX** button at the bottom left to enter the Arena!');
 });
 
 bot.launch();
 
-// Dummy Server for Render
+// Express Server Running on Render Port
 const port = process.env.PORT || 3000;
-http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('CheckerX Backend Running!');
-}).listen(port);
+app.listen(port, () => {
+    console.log(`Express Game UI Server running on port ${port}`);
+});
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
