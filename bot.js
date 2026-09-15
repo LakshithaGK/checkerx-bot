@@ -5,7 +5,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_ID = "8739780042"; // ඔයාගේ Admin ID එක
+const ADMIN_ID = "8739780042";
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing!");
@@ -104,8 +104,16 @@ io.on('connection', (socket) => {
     });
 
     socket.on('make_move', (moveData) => {
-        if (socket.roomId) {
+        if (socket.roomId && activeRooms[socket.roomId]) {
+            activeRooms[socket.roomId].turn = moveData.nextTurn;
             socket.to(socket.roomId).emit('opponent_moved', moveData);
+        }
+    });
+
+    socket.on('pass_turn', (data) => {
+        if (socket.roomId && activeRooms[socket.roomId]) {
+            activeRooms[socket.roomId].turn = data.nextTurn;
+            socket.to(socket.roomId).emit('turn_passed', { nextTurn: data.nextTurn });
         }
     });
 

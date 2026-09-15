@@ -151,6 +151,7 @@
 
         socket.on('match_found', (data) => {
             myRole = data.role;
+            currentTurn = 'red';
             timeOutCount = 0;
             navTo('gameScreen');
             setupInitialBoard();
@@ -166,7 +167,13 @@
             }
             if (data.promoted) boardState[data.to.r][data.to.c].isKing = true;
 
-            currentTurn = myRole;
+            currentTurn = data.nextTurn;
+            renderBoard();
+            startTurnTimer();
+        });
+
+        socket.on('turn_passed', (data) => {
+            currentTurn = data.nextTurn;
             renderBoard();
             startTurnTimer();
         });
@@ -216,6 +223,8 @@
                 if (timeOutCount === 1) {
                     document.getElementById('warnModal').style.display = 'flex';
                     currentTurn = (myRole === 'red') ? 'black' : 'red';
+                    socket.emit('pass_turn', { nextTurn: currentTurn });
+                    renderBoard();
                     startTurnTimer();
                 } else if (timeOutCount >= 2) {
                     socket.emit('timeout_loss');
@@ -448,11 +457,12 @@
                         promoted = true;
                     }
 
-                    socket.emit('make_move', { from: selectedPiece, to: { r, c }, capturedSequence: move.capturedSequence, promoted });
+                    let nextTurn = (myRole === 'red') ? 'black' : 'red';
+                    socket.emit('make_move', { from: selectedPiece, to: { r, c }, capturedSequence: move.capturedSequence, promoted, nextTurn });
 
                     selectedPiece = null;
                     legalMoves = [];
-                    currentTurn = (myRole === 'red') ? 'black' : 'red';
+                    currentTurn = nextTurn;
                     renderBoard();
                     startTurnTimer();
                     return;
