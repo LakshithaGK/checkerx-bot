@@ -1,39 +1,23 @@
 const { Telegraf } = require('telegraf');
+const http = require('http');
 
-const token = '8872491990:AAFHWz6LMI-UjhOVqGf1nPJZY-XtOrT52DE';
-const bot = new Telegraf(token);
-const gameUrl = 'https://lakshithagk.github.io/checkerx/';
+// Initialize Telegram Bot
+const bot = new Telegraf(process.env.BOT_TOKEN || 'YOUR_BOT_TOKEN_HERE');
 
-bot.start((ctx) => {
-    const firstName = ctx.from.first_name || 'Player';
-    ctx.reply(
-        `👋 Welcome ${firstName} to CheckerX!\n\nThe Ultimate Skill-Based Checkers Game. Click the button below to start playing:`,
-        {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '🎮 Play CheckerX Now', web_app: { url: gameUrl } }]
-                ]
-            }
-        }
-    );
-});
+bot.start((ctx) => ctx.reply('Welcome to CheckerX Bot! 🎮'));
 
 console.log('CheckerX Bot is running...');
 bot.launch();
-const http = require('http');
-const port = process.env.PORT || 3000;
-http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('CheckerX Bot is active!\n');
-}).listen(port, () => {
-    console.log(`Port binding server running on port ${port}`);
-});
-const http = require('http');
-const port = process.env.PORT || 3000;
 
+// Dummy HTTP Server to satisfy Render Web Service port checks
+const port = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('CheckerX Bot is Running Successfully!\n');
 }).listen(port, () => {
     console.log(`Port binding server running on port ${port}`);
 });
+
+// Enable graceful stop
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
