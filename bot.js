@@ -1,8 +1,15 @@
 const { Telegraf } = require('telegraf');
 const http = require('http');
 
-// Initialize Telegram Bot with Token
-const bot = new Telegraf('8872491990:AAFHWz6LMI-UjhOVqGf1nPJZY-XtOrT52DE'); // <-- මෙතැනට ඔයාගේ Bot Token එක direct දාන්න
+// System Environment Variable එකෙන් Token එක ලබාගනී
+const BOT_TOKEN = process.env.BOT_TOKEN;
+
+if (!BOT_TOKEN) {
+    console.error("ERROR: BOT_TOKEN is missing!");
+    process.exit(1);
+}
+
+const bot = new Telegraf(BOT_TOKEN);
 
 bot.start((ctx) => {
     const welcomeMessage = `👋 **Welcome to CheckerX!** 🎮\n\n` +
