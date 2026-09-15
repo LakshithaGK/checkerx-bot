@@ -5,7 +5,8 @@ const { Server } = require('socket.io');
 const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_ID = "8739780042";
+const ADMIN_ID = "8739780042"; // ඔයාගේ ID එක
+const MATCH_LOG_CHANNEL_ID = "https://t.me/+afxcxB06aI5lMmNl"; // 🔴 ඔයාගේ Private Match Results Channel ID එක මෙතනට දෙන්න
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing!");
@@ -18,7 +19,6 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(path.join(__dirname, 'public')));
-
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 const users = {}; 
@@ -70,8 +70,12 @@ bot.launch();
 
 const waitingPlayers = [];
 const activeRooms = {};
+let onlineUsersCount = 0; // 🟢 Active Users Tracker
 
 io.on('connection', (socket) => {
+    onlineUsersCount++;
+    io.emit('online_count', onlineUsersCount); // Update all clients
+
     socket.on('init_user', (userData) => {
         try {
             if (!userData || !userData.id) return;
@@ -127,19 +131,27 @@ io.on('connection', (socket) => {
         }
     });
 
-    function handleWin(winnerSocket, loserSocket, eventName) {
+    // 🏆 Reward & Log System
+    function handleWin(winnerSocket, loserSocket, eventName, reason = "Normal Win") {
         if (!winnerSocket || !winnerSocket.userId) return;
         const winner = getUser(winnerSocket.userId);
-        winner.balance += 180; // 80% Profit, 20 Network fee
+        winner.balance += 180;
         winnerSocket.emit('user_synced', { balance: winner.balance, name: winner.name });
         if (loserSocket && eventName) winnerSocket.emit(eventName);
+
+        // 🟢 Send Match Logs to Private Channel
+        if (loserSocket && loserSocket.userId) {
+            const loser = getUser(loserSocket.userId);
+            const logMsg = `🏆 **Match Finished**\n\n🟢 **Winner:** ${winner.name} (\`${winner.id}\`)\n🔴 **Loser:** ${loser.name} (\`${loser.id}\`)\nℹ️ **Reason:** ${reason}`;
+            bot.telegram.sendMessage(MATCH_LOG_CHANNEL_ID, logMsg).catch(e => console.log("Log error (Check if Bot is admin in channel):", e.message));
+        }
     }
 
     socket.on('game_won', () => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const loserSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
-            handleWin(socket, loserSocket);
+            handleWin(socket, loserSocket, null, "All Pieces Captured");
             loserSocket.emit('you_lost_game');
             delete activeRooms[socket.roomId];
         }
@@ -149,7 +161,7 @@ io.on('connection', (socket) => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
-            handleWin(winnerSocket, socket, 'opponent_timed_out');
+            handleWin(winnerSocket, socket, 'opponent_timed_out', "Turn Timeout Limit Exceeded");
             delete activeRooms[socket.roomId];
         }
     });
@@ -160,13 +172,16 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
+        onlineUsersCount--;
+        io.emit('online_count', onlineUsersCount); // Update counter for all clients
+
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) waitingPlayers.splice(index, 1);
 
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
-            handleWin(winnerSocket, socket, 'opponent_disconnected');
+            handleWin(winnerSocket, socket, 'opponent_disconnected', "Opponent Disconnected");
             delete activeRooms[socket.roomId];
         }
     });

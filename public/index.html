@@ -16,6 +16,11 @@
         .avatar { width: 42px; height: 42px; border-radius: 50%; border: 2px solid #00f2fe; }
         .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 8px 16px; border-radius: 25px; font-weight: 600; font-family: 'Orbitron', sans-serif; color: #00f2fe; text-shadow: 0 0 5px rgba(0,242,254,0.5); }
         
+        /* 🟢 Online Status CSS */
+        .online-indicator { font-size: 11px; color: #8b949e; display: flex; align-items: center; gap: 5px; margin-top: 2px; font-weight: 600; }
+        .blink-dot { width: 8px; height: 8px; background-color: #2ea043; border-radius: 50%; box-shadow: 0 0 8px #2ea043; animation: blinker 1.5s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0.3; } }
+
         .screen { display: none; width: 100%; max-width: 420px; padding: 100px 20px 20px; text-align: center; }
         .active-screen { display: flex; flex-direction: column; align-items: center; }
         
@@ -52,7 +57,13 @@
     <div class="top-bar">
         <div style="display:flex; align-items:center; gap:12px;">
             <img src="https://via.placeholder.com/42/00f2fe/000000?text=X" class="avatar">
-            <span id="userName" style="font-weight: 600; font-size: 15px;">Player</span>
+            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                <span id="userName" style="font-weight: 600; font-size: 15px;">Player</span>
+                <!-- 🟢 Online Status Tracker -->
+                <div class="online-indicator">
+                    <div class="blink-dot"></div> 👤 <span id="onlineCount">1</span> Online
+                </div>
+            </div>
         </div>
         <div class="balance-pill">💰 <span id="userBalance">0</span></div>
     </div>
@@ -146,6 +157,13 @@
         const ctx = canvas.getContext('2d');
 
         socket.emit('init_user', tgUser);
+
+        // 🟢 Update Online Counter Live
+        socket.on('online_count', (count) => {
+            const countEl = document.getElementById('onlineCount');
+            if (countEl) countEl.innerText = count;
+        });
+
         socket.on('user_synced', (data) => {
             userBalance = data.balance;
             document.getElementById('userBalance').innerText = userBalance.toLocaleString();
@@ -289,11 +307,9 @@
 
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
-                    // Wooden Board Theme
-                    ctx.fillStyle = (r + c) % 2 === 0 ? '#deb887' : '#5c3a21'; // Light wood / Dark wood
+                    ctx.fillStyle = (r + c) % 2 === 0 ? '#deb887' : '#5c3a21'; 
                     ctx.fillRect(c * tileSize, r * tileSize, tileSize, tileSize);
 
-                    // Valid Move Destination Highlight (Neon Green Box)
                     if (legalMoves.some(m => m.r === r && m.c === c)) {
                         ctx.fillStyle = 'rgba(46, 204, 113, 0.4)';
                         ctx.fillRect(c * tileSize, r * tileSize, tileSize, tileSize);
@@ -302,7 +318,6 @@
                         ctx.strokeRect(c * tileSize + 2, r * tileSize + 2, tileSize - 4, tileSize - 4);
                     }
 
-                    // Mandatory Capture Indicator (Red Glow underneath piece)
                     if (currentTurn === myRole && mandatoryPieces.some(m => m.r === r && m.c === c)) {
                         ctx.beginPath();
                         ctx.arc(c * tileSize + 20, r * tileSize + 20, 18, 0, Math.PI * 2);
@@ -314,7 +329,6 @@
                     if (piece) {
                         const cx = c * tileSize + 20, cy = r * tileSize + 20;
 
-                        // Selected Piece Highlight
                         if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) {
                             ctx.beginPath();
                             ctx.arc(cx, cy, 19, 0, Math.PI * 2);
@@ -322,7 +336,6 @@
                             ctx.fill();
                         }
 
-                        // Piece Render
                         ctx.beginPath();
                         ctx.arc(cx, cy, 14, 0, Math.PI * 2);
                         ctx.fillStyle = piece.color === 'red' ? '#e74c3c' : '#2c3e50';
@@ -342,7 +355,7 @@
             }
         }
 
-        // PERFECT BRAZILIAN CAPTURE ENGINE
+        // PERFECT BRAZILIAN CAPTURE ENGINE (UNTOUCHED)
         function getPiecePaths(board, r, c, p, visited = []) {
             let paths = [];
             let dirs = [[-1,-1], [-1,1], [1,-1], [1,1]];
@@ -371,7 +384,7 @@
                         let tgt = board[mr][mc];
                         if (tgt) {
                             if (tgt.color !== p.color && !visited.some(v=>v.r===mr&&v.c===mc)) {
-                                let lr = mr+dr, lc = mc+dc; // Must land IMMEDIATELY behind
+                                let lr = mr+dr, lc = mc+dc; 
                                 if (lr>=0 && lr<8 && lc>=0 && lc<8 && !board[lr][lc]) {
                                     canCapture = true;
                                     let nb = JSON.parse(JSON.stringify(board));
@@ -436,7 +449,6 @@
             }
 
             if (allPaths.length > 0) {
-                // MAJORITY CAPTURE RULE ENFORCED
                 let maxCaps = Math.max(...allPaths.map(p => p.caps));
                 let bestPaths = allPaths.filter(p => p.caps === maxCaps);
                 
@@ -474,7 +486,6 @@
             let r = Math.floor((e.clientY - rect.top) / tileSize);
             if (myRole === 'black') { r = 7-r; c = 7-c; }
 
-            // If user is mid-jump, they MUST complete the jump chain
             if (isMultiJumping) {
                 const move = legalMoves.find(m => m.r === r && m.c === c);
                 if (move) executeMove(move, r, c);
@@ -486,7 +497,6 @@
                 if (move) { executeMove(move, r, c); return; }
             }
             
-            // Allow selecting only mandatory pieces if captures are available
             if (mandatoryPieces.length > 0) {
                 if (!mandatoryPieces.some(m => m.r === r && m.c === c)) return;
             }
@@ -506,7 +516,6 @@
             if (move.cap) boardState[move.cap.r][move.cap.c] = null;
 
             let promoted = false;
-            // King promotion rule: ONLY if turn ends on last row
             let isLastRow = (boardState[r][c].color === 'red' && r === 0) || (boardState[r][c].color === 'black' && r === 7);
 
             let nextTurn = myRole; 
