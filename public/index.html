@@ -9,7 +9,7 @@
     <style>
         * { box-sizing: border-box; font-family: 'Poppins', sans-serif; user-select: none; }
         body { margin: 0; background: #0b0e14; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
-        .top-bar { width: 100%; max-width: 420px; padding: 12px 20px; display: flex; justify-content: space-between; background: #161b22; position: fixed; top: 0; z-index: 10; border-bottom: 1px solid #21262d; }
+        .top-bar { width: 100%; max-width: 420px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; background: #161b22; position: fixed; top: 0; z-index: 10; border-bottom: 1px solid #21262d; }
         .avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #00f2fe; }
         .balance-pill { background: rgba(0, 242, 254, 0.1); border: 1px solid #00f2fe; padding: 6px 14px; border-radius: 20px; font-weight: bold; color: #00f2fe; }
         .screen { display: none; width: 100%; max-width: 420px; padding: 80px 20px 20px; text-align: center; }
@@ -23,6 +23,8 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         canvas { border: 4px solid #30363d; border-radius: 12px; cursor: pointer; }
         .rotate-board { transform: rotate(180deg); }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
+        .modal-content { background: #161b22; border: 1px solid #30363d; padding: 25px; border-radius: 16px; width: 90%; max-width: 360px; text-align: center; }
     </style>
 </head>
 <body>
@@ -32,12 +34,14 @@
             <img src="https://via.placeholder.com/38/00f2fe/ffffff?text=X" class="avatar">
             <span id="userName">Player</span>
         </div>
-        <div class="balance-pill">💰 <span id="userBalance">100</span> X Coins</div>
+        <div class="balance-pill">💰 <span id="userBalance">0</span> X Coins</div>
     </div>
 
     <div id="homeScreen" class="screen active-screen">
         <h1 style="color: #00f2fe;">CheckerX Arena</h1>
+        <p style="color: #8b949e; font-size: 14px;">Brazilian Rules Checkers</p>
         <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 PLAY GAME</button>
+        <button class="btn-secondary" onclick="openRulesModal()">📜 Rules</button>
     </div>
 
     <div id="stakeScreen" class="screen">
@@ -55,7 +59,7 @@
     <div id="waitingScreen" class="screen">
         <h2>Searching Opponent...</h2>
         <div class="loader"></div>
-        <p>Waiting for another player on <span id="waitingStake" style="color:#00f2fe;">0</span> Stake</p>
+        <p>Waiting for player on <span id="waitingStake" style="color:#00f2fe;">0</span> Stake</p>
         <button class="btn-secondary" style="background:#8b0000;" onclick="cancelMatchmaking()">Cancel</button>
     </div>
 
@@ -64,10 +68,28 @@
         <canvas id="checkersCanvas" width="320" height="320"></canvas>
     </div>
 
+    <div id="rulesModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: #00f2fe;">🇧🇷 Brazilian Checkers Rules</h3>
+            <p style="text-align: left; font-size: 13px; color: #c9d1d9; line-height: 1.6;">
+                1. <b>Mandatory Captures:</b> Jumps are forced! If a capture move is available, normal moves are disabled.<br>
+                2. <b>Backward Captures:</b> Men pieces can capture both forward and backward.<br>
+                3. <b>King Ability 👑:</b> Kings can fly across open diagonals, but when capturing, they land immediately behind the captured piece.
+            </p>
+            <button class="btn-secondary" onclick="closeRulesModal()">Close</button>
+        </div>
+    </div>
+
     <script>
         const socket = io();
+        const tg = window.Telegram?.WebApp;
+        tg?.expand();
+
+        let tgUser = tg?.initDataUnsafe?.user || { id: 8739780042, first_name: 'TestUser' };
+        let userBalance = 0;
+
         let currentStake = 0;
-        let myRole = ''; // 'red' or 'black'
+        let myRole = ''; 
         let currentTurn = 'red';
         const tileSize = 40;
         let boardState = [];
@@ -76,6 +98,19 @@
 
         const canvas = document.getElementById('checkersCanvas');
         const ctx = canvas.getContext('2d');
+
+        // Authenticate with Telegram details
+        socket.emit('init_user', tgUser);
+
+        socket.on('user_synced', (data) => {
+            userBalance = data.balance;
+            document.getElementById('userBalance').innerText = userBalance.toLocaleString();
+            document.getElementById('userName').innerText = data.name;
+        });
+
+        socket.on('error_message', (msg) => {
+            alert(msg);
+        });
 
         function navTo(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
@@ -88,11 +123,16 @@
             el.classList.add('active-stake');
         }
 
+        function openRulesModal() { document.getElementById('rulesModal').style.display = 'flex'; }
+        function closeRulesModal() { document.getElementById('rulesModal').style.display = 'none'; }
+
         function startMatchmaking() {
-            if (currentStake === 0) return alert('Select a stake!');
+            if (currentStake === 0) return alert('Select a stake amount!');
+            if (userBalance < currentStake) return alert('Insufficient Balance! Please deposit coins to play.');
+            
             document.getElementById('waitingStake').innerText = currentStake;
             navTo('waitingScreen');
-            socket.emit('find_match', { stake: currentStake, name: 'Player' });
+            socket.emit('find_match', { stake: currentStake, userId: tgUser.id });
         }
 
         function cancelMatchmaking() {
@@ -100,7 +140,6 @@
             navTo('stakeScreen');
         }
 
-        // Server finds match -> Both players enter game
         socket.on('match_found', (data) => {
             myRole = data.role;
             navTo('gameScreen');
@@ -109,10 +148,15 @@
             updateTurnStatus();
         });
 
-        // Opponent makes a move -> Board updates live
         socket.on('opponent_moved', (data) => {
             boardState[data.to.r][data.to.c] = boardState[data.from.r][data.from.c];
             boardState[data.from.r][data.from.c] = null;
+            if (data.captured) {
+                boardState[data.captured.r][data.captured.c] = null;
+            }
+            if (data.promoted) {
+                boardState[data.to.r][data.to.c].isKing = true;
+            }
             currentTurn = myRole;
             renderBoard();
             updateTurnStatus();
@@ -145,7 +189,7 @@
 
                     const isLegal = legalMoves.some(m => m.r === r && m.c === c);
                     if (isLegal) {
-                        ctx.fillStyle = 'rgba(46, 204, 113, 0.6)';
+                        ctx.fillStyle = 'rgba(46, 204, 113, 0.7)';
                         ctx.fillRect(c * tileSize, r * tileSize, tileSize, tileSize);
                     }
 
@@ -154,35 +198,151 @@
                         const centerX = c * tileSize + 20;
                         const centerY = r * tileSize + 20;
 
+                        if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) {
+                            ctx.beginPath();
+                            ctx.arc(centerX, centerY, 18, 0, Math.PI * 2);
+                            ctx.fillStyle = '#00f2fe'; ctx.fill();
+                        }
+
                         ctx.beginPath();
                         ctx.arc(centerX, centerY, 15, 0, Math.PI * 2);
                         ctx.fillStyle = piece.color === 'red' ? '#e74c3c' : '#2c3e50';
                         ctx.fill();
                         ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+
+                        if (piece.isKing) {
+                            ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                            ctx.fillText('👑', centerX, centerY);
+                        }
                     }
                 }
             }
         }
 
+        // Brazilian Moves Engine Logic
+        function getAllCapturesForRole(color) {
+            let allCaptures = [];
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    let p = boardState[r][c];
+                    if (p && p.color === color) {
+                        let caps = getPieceCaptures(r, c);
+                        if (caps.length > 0) {
+                            allCaptures.push({ from: { r, c }, moves: caps });
+                        }
+                    }
+                }
+            }
+            return allCaptures;
+        }
+
+        function getPieceCaptures(r, c) {
+            let p = boardState[r][c];
+            let captures = [];
+            let dirs = [[-1,-1], [-1,1], [1,-1], [1,1]];
+
+            if (!p.isKing) {
+                // Regular Man captures (forward & backward)
+                dirs.forEach(([dr, dc]) => {
+                    let mr = r + dr, mc = c + dc;
+                    let lr = r + dr * 2, lc = c + dc * 2;
+                    if (lr >= 0 && lr < 8 && lc >= 0 && lc < 8) {
+                        if (boardState[mr][mc] && boardState[mr][mc].color !== p.color && !boardState[lr][lc]) {
+                            captures.push({ r: lr, c: lc, captured: { r: mr, c: mc } });
+                        }
+                    }
+                });
+            } else {
+                // King captures: Flying diagonally, but landing IMMEDIATELY behind the captured piece
+                dirs.forEach(([dr, dc]) => {
+                    let step = 1;
+                    while (true) {
+                        let mr = r + dr * step;
+                        let mc = c + dc * step;
+                        if (mr < 0 || mr >= 8 || mc < 0 || mc >= 8) break;
+
+                        if (boardState[mr][mc]) {
+                            if (boardState[mr][mc].color !== p.color) {
+                                // Landing spot immediately behind enemy piece
+                                let lr = mr + dr;
+                                let lc = mc + dc;
+                                if (lr >= 0 && lr < 8 && lc >= 0 && lc < 8 && !boardState[lr][lc]) {
+                                    captures.push({ r: lr, c: lc, captured: { r: mr, c: mc } });
+                                }
+                            }
+                            break; // Stop scanning this line after meeting a piece
+                        }
+                        step++;
+                    }
+                });
+            }
+            return captures;
+        }
+
+        function calculateMoves(r, c) {
+            legalMoves = [];
+            let p = boardState[r][c];
+            let allCaptures = getAllCapturesForRole(p.color);
+
+            if (allCaptures.length > 0) {
+                // Mandatory Jumps Rule
+                let pieceCap = allCaptures.find(ac => ac.from.r === r && ac.from.c === c);
+                if (pieceCap) {
+                    legalMoves = pieceCap.moves;
+                }
+            } else {
+                // Normal Moves
+                let dirs = p.isKing ? [[-1,-1], [-1,1], [1,-1], [1,1]] : (p.color === 'red' ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]]);
+                dirs.forEach(([dr, dc]) => {
+                    if (!p.isKing) {
+                        let nr = r + dr, nc = c + dc;
+                        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && !boardState[nr][nc]) {
+                            legalMoves.push({ r: nr, c: nc });
+                        }
+                    } else {
+                        // Flying King Normal Move
+                        let step = 1;
+                        while (true) {
+                            let nr = r + dr * step;
+                            let nc = c + dc * step;
+                            if (nr < 0 || nr >= 8 || nc < 0 || nc >= 8 || boardState[nr][nc]) break;
+                            legalMoves.push({ r: nr, c: nc });
+                            step++;
+                        }
+                    }
+                });
+            }
+        }
+
         canvas.addEventListener('click', (e) => {
-            if (currentTurn !== myRole) return; // Ignore if not my turn
+            if (currentTurn !== myRole) return;
 
             const rect = canvas.getBoundingClientRect();
             let c = Math.floor((e.clientX - rect.left) / tileSize);
             let r = Math.floor((e.clientY - rect.top) / tileSize);
 
-            if (myRole === 'black') { r = 7 - r; c = 7 - c; } // Reverse click for rotated board
+            if (myRole === 'black') { r = 7 - r; c = 7 - c; }
 
             const clicked = boardState[r][c];
 
             if (selectedPiece) {
                 const move = legalMoves.find(m => m.r === r && m.c === c);
                 if (move) {
+                    let promoted = false;
                     boardState[r][c] = boardState[selectedPiece.r][selectedPiece.c];
                     boardState[selectedPiece.r][selectedPiece.c] = null;
 
-                    // Emit Move to Opponent Live
-                    socket.emit('make_move', { from: selectedPiece, to: { r, c } });
+                    if (move.captured) {
+                        boardState[move.captured.r][move.captured.c] = null;
+                    }
+
+                    // Promotion
+                    if ((boardState[r][c].color === 'red' && r === 0) || (boardState[r][c].color === 'black' && r === 7)) {
+                        boardState[r][c].isKing = true;
+                        promoted = true;
+                    }
+
+                    socket.emit('make_move', { from: selectedPiece, to: { r, c }, captured: move.captured, promoted });
 
                     selectedPiece = null;
                     legalMoves = [];
@@ -199,17 +359,6 @@
                 renderBoard();
             }
         });
-
-        function calculateMoves(r, c) {
-            legalMoves = [];
-            const dirs = myRole === 'red' ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]];
-            dirs.forEach(([dr, dc]) => {
-                const nr = r + dr, nc = c + dc;
-                if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && !boardState[nr][nc]) {
-                    legalMoves.push({ r: nr, c: nc });
-                }
-            });
-        }
     </script>
 </body>
 </html>
