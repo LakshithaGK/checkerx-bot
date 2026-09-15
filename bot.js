@@ -3,10 +3,10 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const mongoose = require('mongoose'); // 🟢 MongoDB Mongoose Library
+const mongoose = require('mongoose');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const MONGO_URI = process.env.MONGO_URI; // 🟢 Render එකෙන් Read කරයි
+const MONGO_URI = process.env.MONGO_URI; 
 const ADMIN_ID = "8739780042"; 
 const MATCH_LOG_CHANNEL_ID = "-1004321776706"; 
 
@@ -15,12 +15,10 @@ if (!BOT_TOKEN) {
     process.exit(1);
 }
 
-// 🟢 Connect to MongoDB Atlas
 mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ Successfully connected to MongoDB Atlas!"))
     .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
-// 🟢 Mongoose User Schema & Model
 const userSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
     name: { type: String, default: 'Player' },
@@ -37,7 +35,6 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// 🟢 Async Database Helper Functions
 async function getUser(id, name) {
     const userId = String(id || 'guest');
     try {
@@ -57,7 +54,6 @@ async function getUser(id, name) {
     }
 }
 
-// --- BOT COMMANDS ---
 bot.start(async (ctx) => {
     const user = await getUser(ctx.from.id, ctx.from.first_name);
     const welcomeMsg = `👋 **Welcome to CheckerX Arena!** 🎮\n\n💰 **Your Balance:** ${user.balance.toLocaleString()} X Coins ($${(user.balance/100).toFixed(2)})`;
@@ -113,7 +109,6 @@ bot.command('addcoins', async (ctx) => {
 
 bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.error("Bot Error:", err.message));
 
-// --- MULTIPLAYER ENGINE ---
 const waitingPlayers = [];
 const activeRooms = {};
 let onlineUsersCount = 0; 
@@ -149,7 +144,6 @@ io.on('connection', (socket) => {
                 socket.roomId = roomId; opponent.roomId = roomId;
                 activeRooms[roomId] = { p1: socket, p2: opponent, turn: 'red' };
 
-                // 💰 Deduct Coins from MongoDB
                 const u1 = await User.findOne({ id: socket.userId });
                 const u2 = await User.findOne({ id: opponent.userId });
                 
@@ -207,11 +201,14 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 🟢 Improved Timeout Handling (Works for both players securely)
     socket.on('timeout_loss', async () => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
             await handleWin(winnerSocket, socket, 'opponent_timed_out', "Turn Timeout Limit Exceeded");
+            winnerSocket.emit('opponent_timed_out');
+            socket.emit('you_lost_game');
             delete activeRooms[socket.roomId];
         }
     });
@@ -232,6 +229,7 @@ io.on('connection', (socket) => {
             const room = activeRooms[socket.roomId];
             const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
             await handleWin(winnerSocket, socket, 'opponent_disconnected', "Opponent Disconnected / Left Match");
+            winnerSocket.emit('opponent_disconnected');
             delete activeRooms[socket.roomId];
         }
     });
