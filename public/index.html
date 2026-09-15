@@ -5,80 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CheckerX Arena</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <style>
-        * { box-sizing: border-box; font-family: 'Poppins', 'Segoe UI', sans-serif; user-select: none; }
-        body {
-            margin: 0; padding: 0; background: #0b0e14; color: #fff;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh;
-        }
-
-        .top-bar {
-            width: 100%; max-width: 420px; padding: 12px 20px;
-            display: flex; justify-content: space-between; align-items: center;
-            background: #161b22; border-bottom: 1px solid #21262d; position: fixed; top: 0; z-index: 10;
-        }
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; user-select: none; }
+        body { margin: 0; background: #0b0e14; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+        .top-bar { width: 100%; max-width: 420px; padding: 12px 20px; display: flex; justify-content: space-between; background: #161b22; position: fixed; top: 0; z-index: 10; border-bottom: 1px solid #21262d; }
         .avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #00f2fe; }
         .balance-pill { background: rgba(0, 242, 254, 0.1); border: 1px solid #00f2fe; padding: 6px 14px; border-radius: 20px; font-weight: bold; color: #00f2fe; }
-
         .screen { display: none; width: 100%; max-width: 420px; padding: 80px 20px 20px; text-align: center; }
         .active-screen { display: flex; flex-direction: column; align-items: center; }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #00c6ff, #0072ff);
-            color: #fff; border: none; padding: 14px 32px; font-size: 16px; font-weight: bold;
-            border-radius: 12px; cursor: pointer; margin-top: 15px; width: 85%;
-            box-shadow: 0 4px 15px rgba(0,198,255,0.3); transition: 0.2s;
-        }
-        .btn-secondary {
-            background: #161b22; color: #c9d1d9; border: 1px solid #30363d;
-            padding: 12px 24px; font-size: 14px; border-radius: 10px; cursor: pointer; margin-top: 10px; width: 85%;
-        }
-
+        .btn-primary { background: linear-gradient(135deg, #00c6ff, #0072ff); color: #fff; border: none; padding: 14px 32px; font-size: 16px; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 85%; }
+        .btn-secondary { background: #161b22; color: #c9d1d9; border: 1px solid #30363d; padding: 12px 24px; font-size: 14px; border-radius: 10px; cursor: pointer; margin-top: 10px; width: 85%; }
         .stake-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; margin: 20px 0; }
-        .stake-card {
-            background: #161b22; border: 2px solid #30363d; padding: 18px;
-            border-radius: 12px; font-weight: bold; cursor: pointer; color: #00f2fe; font-size: 16px;
-        }
-        .stake-card.active-stake { border-color: #00f2fe; background: rgba(0, 242, 254, 0.15); box-shadow: 0 0 10px rgba(0,242,254,0.3); }
-
-        /* Loader & Waiting Screen */
-        .loader {
-            border: 4px solid #161b22; border-top: 4px solid #00f2fe; border-radius: 50%;
-            width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px 0;
-        }
+        .stake-card { background: #161b22; border: 2px solid #30363d; padding: 18px; border-radius: 12px; font-weight: bold; cursor: pointer; color: #00f2fe; }
+        .stake-card.active-stake { border-color: #00f2fe; background: rgba(0, 242, 254, 0.15); }
+        .loader { border: 4px solid #161b22; border-top: 4px solid #00f2fe; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px 0; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Canvas & Rotated Board */
-        .board-container { margin-top: 10px; position: relative; }
-        canvas { border: 4px solid #30363d; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); cursor: pointer; }
+        canvas { border: 4px solid #30363d; border-radius: 12px; cursor: pointer; }
         .rotate-board { transform: rotate(180deg); }
-
-        .modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; flex-direction: column; padding: 20px;
-        }
-        .modal-content { background: #161b22; border: 1px solid #30363d; padding: 25px; border-radius: 16px; width: 90%; max-width: 360px; text-align: center; }
     </style>
 </head>
 <body>
 
     <div class="top-bar">
         <div style="display:flex; align-items:center; gap:10px;">
-            <img src="https://via.placeholder.com/38/00f2fe/ffffff?text=X" class="avatar" alt="Profile">
-            <span style="font-weight: 600;" id="userName">Player</span>
+            <img src="https://via.placeholder.com/38/00f2fe/ffffff?text=X" class="avatar">
+            <span id="userName">Player</span>
         </div>
         <div class="balance-pill">💰 <span id="userBalance">100</span> X Coins</div>
     </div>
 
-    <!-- 1. Main Home Screen -->
     <div id="homeScreen" class="screen active-screen">
-        <h1 style="color: #00f2fe; margin-bottom: 5px;">CheckerX Arena</h1>
-        <p style="color: #8b949e; font-size: 14px;">Royal Skill-Based Checkers</p>
+        <h1 style="color: #00f2fe;">CheckerX Arena</h1>
         <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 PLAY GAME</button>
-        <button class="btn-secondary" onclick="openRulesModal()">📜 Game Rules</button>
     </div>
 
-    <!-- 2. Stake Selection Screen -->
     <div id="stakeScreen" class="screen">
         <h3>Select Stake Amount</h3>
         <div class="stake-grid">
@@ -88,94 +49,77 @@
             <div class="stake-card" onclick="setStake(500, this)">500 Coins</div>
         </div>
         <button class="btn-primary" onclick="startMatchmaking()">FIND MATCH</button>
-        <button class="btn-secondary" onclick="navTo('homeScreen')">⬅ Back to Menu</button>
+        <button class="btn-secondary" onclick="navTo('homeScreen')">⬅ Back</button>
     </div>
 
-    <!-- 3. Waiting For Opponent Screen -->
     <div id="waitingScreen" class="screen">
         <h2>Searching Opponent...</h2>
         <div class="loader"></div>
-        <p style="color: #8b949e;">Stake: <span id="waitingStake" style="color:#00f2fe; font-weight:bold;">0</span> X Coins</p>
-        <button class="btn-secondary" style="background:#8b0000;" onclick="cancelMatchmaking()">Cancel Search</button>
+        <p>Waiting for another player on <span id="waitingStake" style="color:#00f2fe;">0</span> Stake</p>
+        <button class="btn-secondary" style="background:#8b0000;" onclick="cancelMatchmaking()">Cancel</button>
     </div>
 
-    <!-- 4. Active Game Screen -->
     <div id="gameScreen" class="screen">
-        <div style="margin-bottom: 10px; color: #00f2fe; font-weight: bold;" id="turnIndicator">Your Turn!</div>
-        <div class="board-container">
-            <canvas id="checkersCanvas" width="320" height="320"></canvas>
-        </div>
-    </div>
-
-    <!-- Rules Modal -->
-    <div id="rulesModal" class="modal">
-        <div class="modal-content">
-            <h3 style="color: #00f2fe;">📜 Royal Game Rules</h3>
-            <p style="text-align: left; font-size: 13px; color: #c9d1d9; line-height: 1.6;">
-                1. <b>Green Highlights:</b> Show valid normal moves.<br>
-                2. <b>Red Highlights:</b> Mandatory jump/capture moves!<br>
-                3. <b>Kings 👑:</b> Reaching opponent's last row promotes your piece to King.<br>
-                4. Kings can move and jump both forwards and backwards diagonally.
-            </p>
-            <button class="btn-secondary" onclick="closeRulesModal()">Close</button>
-        </div>
-    </div>
-
-    <!-- Win/Loss Modal -->
-    <div id="gameEndModal" class="modal">
-        <div class="modal-content">
-            <h2 id="endResultTitle" style="color: #00f2fe;">VICTORY! 🎉</h2>
-            <p id="endResultDesc">You won 180 X Coins</p>
-            <button class="btn-primary" onclick="navTo('stakeScreen'); closeEndModal();">Rematch</button>
-            <button class="btn-secondary" onclick="navTo('homeScreen'); closeEndModal();">Back to Menu</button>
-        </div>
+        <div id="statusText" style="color:#00f2fe; font-weight:bold; margin-bottom:10px;">Your Turn</div>
+        <canvas id="checkersCanvas" width="320" height="320"></canvas>
     </div>
 
     <script>
+        const socket = io();
         let currentStake = 0;
-        let myColor = 'red'; 
-        const boardSize = 8;
+        let myRole = ''; // 'red' or 'black'
+        let currentTurn = 'red';
         const tileSize = 40;
         let boardState = [];
         let selectedPiece = null;
         let legalMoves = [];
-        let searchTimer = null;
 
         const canvas = document.getElementById('checkersCanvas');
         const ctx = canvas.getContext('2d');
 
-        function navTo(screenId) {
+        function navTo(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
-            document.getElementById(screenId).classList.add('active-screen');
+            document.getElementById(id).classList.add('active-screen');
         }
 
-        function setStake(amount, element) {
+        function setStake(amount, el) {
             currentStake = amount;
             document.querySelectorAll('.stake-card').forEach(c => c.classList.remove('active-stake'));
-            element.classList.add('active-stake');
+            el.classList.add('active-stake');
         }
 
-        function openRulesModal() { document.getElementById('rulesModal').style.display = 'flex'; }
-        function closeRulesModal() { document.getElementById('rulesModal').style.display = 'none'; }
-        function closeEndModal() { document.getElementById('gameEndModal').style.display = 'none'; }
-
-        // Start Waiting Tab logic
         function startMatchmaking() {
-            if (currentStake === 0) return alert('Please select a stake amount!');
+            if (currentStake === 0) return alert('Select a stake!');
             document.getElementById('waitingStake').innerText = currentStake;
             navTo('waitingScreen');
-            
-            // Simulating real matchmaking wait time
-            searchTimer = setTimeout(() => {
-                navTo('gameScreen');
-                setupInitialBoard();
-                renderBoard();
-            }, 3000);
+            socket.emit('find_match', { stake: currentStake, name: 'Player' });
         }
 
         function cancelMatchmaking() {
-            clearTimeout(searchTimer);
+            socket.emit('cancel_search');
             navTo('stakeScreen');
+        }
+
+        // Server finds match -> Both players enter game
+        socket.on('match_found', (data) => {
+            myRole = data.role;
+            navTo('gameScreen');
+            setupInitialBoard();
+            renderBoard();
+            updateTurnStatus();
+        });
+
+        // Opponent makes a move -> Board updates live
+        socket.on('opponent_moved', (data) => {
+            boardState[data.to.r][data.to.c] = boardState[data.from.r][data.from.c];
+            boardState[data.from.r][data.from.c] = null;
+            currentTurn = myRole;
+            renderBoard();
+            updateTurnStatus();
+        });
+
+        function updateTurnStatus() {
+            document.getElementById('statusText').innerText = (currentTurn === myRole) ? "🟢 Your Turn!" : "⏳ Opponent's Turn...";
         }
 
         function setupInitialBoard() {
@@ -191,97 +135,74 @@
         }
 
         function renderBoard() {
-            if (myColor === 'black') canvas.classList.add('rotate-board');
+            if (myRole === 'black') canvas.classList.add('rotate-board');
             else canvas.classList.remove('rotate-board');
 
-            for (let r = 0; r < boardSize; r++) {
-                for (let c = 0; c < boardSize; c++) {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
                     ctx.fillStyle = (r + c) % 2 === 0 ? '#f0d9b5' : '#b58863';
                     ctx.fillRect(c * tileSize, r * tileSize, tileSize, tileSize);
 
-                    // Highlight legal moves
                     const isLegal = legalMoves.some(m => m.r === r && m.c === c);
                     if (isLegal) {
-                        ctx.fillStyle = 'rgba(46, 204, 113, 0.6)'; // Green Highlight
+                        ctx.fillStyle = 'rgba(46, 204, 113, 0.6)';
                         ctx.fillRect(c * tileSize, r * tileSize, tileSize, tileSize);
                     }
 
                     const piece = boardState[r][c];
                     if (piece) {
-                        const centerX = c * tileSize + tileSize / 2;
-                        const centerY = r * tileSize + tileSize / 2;
-                        const radius = tileSize / 2 - 5;
-
-                        // Selected Piece Highlight
-                        if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) {
-                            ctx.beginPath();
-                            ctx.arc(centerX, centerY, radius + 3, 0, Math.PI * 2);
-                            ctx.fillStyle = '#00f2fe';
-                            ctx.fill();
-                        }
-
-                        // Piece Shadow & Body
-                        ctx.beginPath();
-                        ctx.arc(centerX + 2, centerY + 2, radius, 0, Math.PI * 2);
-                        ctx.fillStyle = 'rgba(0,0,0,0.4)';
-                        ctx.fill();
+                        const centerX = c * tileSize + 20;
+                        const centerY = r * tileSize + 20;
 
                         ctx.beginPath();
-                        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                        ctx.arc(centerX, centerY, 15, 0, Math.PI * 2);
                         ctx.fillStyle = piece.color === 'red' ? '#e74c3c' : '#2c3e50';
                         ctx.fill();
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = '#fff';
-                        ctx.stroke();
-
-                        if (piece.isKing) {
-                            ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                            ctx.fillText('👑', centerX, centerY);
-                        }
+                        ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
                     }
                 }
             }
         }
 
-        // Canvas Click Listener for Piece Movement & Selection
         canvas.addEventListener('click', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const c = Math.floor((e.clientX - rect.left) / tileSize);
-            const r = Math.floor((e.clientY - rect.top) / tileSize);
+            if (currentTurn !== myRole) return; // Ignore if not my turn
 
-            const clickedPiece = boardState[r][c];
+            const rect = canvas.getBoundingClientRect();
+            let c = Math.floor((e.clientX - rect.left) / tileSize);
+            let r = Math.floor((e.clientY - rect.top) / tileSize);
+
+            if (myRole === 'black') { r = 7 - r; c = 7 - c; } // Reverse click for rotated board
+
+            const clicked = boardState[r][c];
 
             if (selectedPiece) {
                 const move = legalMoves.find(m => m.r === r && m.c === c);
                 if (move) {
-                    // Move Piece
                     boardState[r][c] = boardState[selectedPiece.r][selectedPiece.c];
                     boardState[selectedPiece.r][selectedPiece.c] = null;
 
-                    // King Promotion
-                    if ((boardState[r][c].color === 'red' && r === 0) || (boardState[r][c].color === 'black' && r === 7)) {
-                        boardState[r][c].isKing = true;
-                    }
+                    // Emit Move to Opponent Live
+                    socket.emit('make_move', { from: selectedPiece, to: { r, c } });
 
                     selectedPiece = null;
                     legalMoves = [];
+                    currentTurn = (myRole === 'red') ? 'black' : 'red';
                     renderBoard();
+                    updateTurnStatus();
                     return;
                 }
             }
 
-            if (clickedPiece && clickedPiece.color === myColor) {
+            if (clicked && clicked.color === myRole) {
                 selectedPiece = { r, c };
-                calculateLegalMoves(r, c);
+                calculateMoves(r, c);
                 renderBoard();
             }
         });
 
-        function calculateLegalMoves(r, c) {
+        function calculateMoves(r, c) {
             legalMoves = [];
-            const piece = boardState[r][c];
-            const dirs = piece.isKing ? [[-1,-1], [-1,1], [1,-1], [1,1]] : (piece.color === 'red' ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]]);
-
+            const dirs = myRole === 'red' ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]];
             dirs.forEach(([dr, dc]) => {
                 const nr = r + dr, nc = c + dc;
                 if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && !boardState[nr][nc]) {

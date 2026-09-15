@@ -1,9 +1,11 @@
 const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_ID = "YOUR_TELEGRAM_USER_ID"; // ඔයාගේ Telegram User ID එක මෙතැනට දාන්න
+const ADMIN_ID = "8739780042"; // ඔයාගේ Admin ID එක
 const DEPOSIT_CHANNEL_ID = "@your_deposit_channel";
 const WITHDRAW_CHANNEL_ID = "@your_withdraw_channel";
 
@@ -14,8 +16,9 @@ if (!BOT_TOKEN) {
 
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
-// Public Folder එකෙන් index.html (Game UI) එක Web App එකක් විදිහට Serve කිරීම
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
@@ -28,158 +31,88 @@ const users = {};
 function getUser(ctx) {
     const id = ctx.from.id;
     if (!users[id]) {
-        users[id] = {
-            id: id,
-            name: ctx.from.first_name,
-            balance: 0,
-            referredBy: null,
-            hasDeposited: false
-        };
+        users[id] = { id: id, name: ctx.from.first_name, balance: 100, referredBy: null };
     }
     return users[id];
 }
 
-// 1. /start Command
+// Bot Commands
 bot.start((ctx) => {
     const user = getUser(ctx);
-    
-    const startPayload = ctx.startPayload;
-    if (startPayload && !user.referredBy && startPayload != user.id) {
-        user.referredBy = startPayload;
-    }
-
-    const welcomeMsg = `👋 **Welcome to CheckerX Ecosystem!** 🎮\n\n` +
-        `Play skill-based Checkers games, earn X Coins, and instantly withdraw!\n\n` +
-        `👤 **Name:** ${user.name}\n` +
-        `💰 **Balance:** ${user.balance} X Coins`;
-
+    const welcomeMsg = `👋 **Welcome to CheckerX Ecosystem!** 🎮\n\n💰 **Balance:** ${user.balance} X Coins`;
     const mainMenu = Markup.keyboard([
         ['🎮 Play CheckerX', '💰 Balance'],
         ['📥 Deposit', '📤 Withdrawal'],
         ['🔗 Referral', '💬 Customer Support']
     ]).resize();
-
     return ctx.replyWithMarkdown(welcomeMsg, mainMenu);
 });
 
-// 2. Balance Button
 bot.hears('💰 Balance', (ctx) => {
     const user = getUser(ctx);
-    ctx.reply(`💳 **Your Wallet Balance:**\n\n💰 **${user.balance} X Coins**`);
+    ctx.reply(`💳 **Your Balance:** ${user.balance} X Coins`);
 });
 
-// 3. Deposit Option
-bot.hears('📥 Deposit', (ctx) => {
-    ctx.reply('📥 **Select Your Preferred Deposit Method:**', Markup.inlineKeyboard([
-        [Markup.button.callback('Binance Pay', 'dep_binance')],
-        [Markup.button.callback('USDT (TRC20)', 'dep_usdt')],
-        [Markup.button.callback('TRX (TRC20)', 'dep_trx')]
-    ]));
-});
-
-bot.action(/dep_(.+)/, (ctx) => {
-    const method = ctx.match[1].toUpperCase();
-    const adminAddress = "YOUR_CRYPTO_WALLET_ADDRESS_HERE";
-
-    ctx.replyWithMarkdown(`📥 **Deposit via ${method}**\n\n` +
-        `Please send your payment to the following address:\n\n` +
-        `\`${adminAddress}\`\n\n` +
-        `⚠️ **Instructions:**\n` +
-        `1. Send payment.\n` +
-        `2. Send screenshot & TxID here.\n\n` +
-        `Format: \`/submit_deposit <TxID>\``);
-});
-
-// 4. Submit Deposit Request
-bot.command('submit_deposit', (ctx) => {
-    const user = getUser(ctx);
-    const txId = ctx.message.text.split(' ')[1];
-
-    if (!txId) return ctx.reply("❌ Please provide TxID! Example: `/submit_deposit 1234567`");
-
-    const msg = `📥 **NEW DEPOSIT REQUEST**\n\n` +
-        `👤 **User:** ${user.name} (\`${user.id}\`)\n` +
-        `🧾 **TxID:** \`${txId}\`\n\n` +
-        `Approve Coins using: \`/addcoins ${user.id} <amount>\``;
-
-    bot.telegram.sendMessage(DEPOSIT_CHANNEL_ID, msg);
-    ctx.reply("✅ Your deposit request has been submitted to Admin!");
-});
-
-// 5. Withdrawal Logic
-bot.hears('📤 Withdrawal', (ctx) => {
-    ctx.reply("📤 To withdraw, please use the following command:\n\nFormat: `/withdraw <Address> <Amount>`");
-});
-
-bot.command('withdraw', (ctx) => {
-    const user = getUser(ctx);
-    const args = ctx.message.text.split(' ');
-    const address = args[1];
-    const amount = parseFloat(args[2]);
-
-    if (!address || !amount || amount > user.balance) {
-        return ctx.reply("❌ Invalid address or insufficient balance!");
-    }
-
-    user.balance -= amount;
-
-    const msg = `📤 **NEW WITHDRAWAL REQUEST**\n\n` +
-        `👤 **User:** ${user.name} (\`${user.id}\`)\n` +
-        `📍 **Address:** \`${address}\`\n` +
-        `💰 **Amount:** ${amount} X Coins`;
-
-    bot.telegram.sendMessage(WITHDRAW_CHANNEL_ID, msg);
-    ctx.reply("✅ Withdrawal request submitted successfully!");
-});
-
-// 6. Referral Link
-bot.hears('🔗 Referral', (ctx) => {
-    const user = getUser(ctx);
-    const refLink = `https://t.me/CheckerX_Bot?start=${user.id}`;
-    ctx.reply(`🔗 **Your Referral Link:**\n${refLink}\n\n🎁 Share with friends! Get **10 X Coins ($0.1)** for every referral's first deposit.`);
-});
-
-// 7. Customer Support
-bot.hears('💬 Customer Support', (ctx) => {
-    ctx.reply('💬 **Customer Support:**\n\n👤 Direct Admin: @YourPersonalTelegramUsername\n🤖 Support Bot: @YourSupportBotUsername');
-});
-
-// 8. Admin Add Coins
-bot.command('addcoins', (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_ID) return;
-    const args = ctx.message.text.split(' ');
-    const targetId = args[1];
-    const amount = parseFloat(args[2]);
-
-    if (users[targetId]) {
-        users[targetId].balance += amount;
-
-        if (!users[targetId].hasDeposited && users[targetId].referredBy) {
-            const referrer = users[users[targetId].referredBy];
-            if (referrer) {
-                referrer.balance += 10;
-                bot.telegram.sendMessage(referrer.id, "🎉 You earned 10 X Coins referral bonus!");
-            }
-            users[targetId].hasDeposited = true;
-        }
-
-        bot.telegram.sendMessage(targetId, `🎉 ${amount} X Coins added to your wallet!`);
-        ctx.reply(`✅ Added ${amount} coins to ${targetId}`);
-    }
-});
-
-// Play Notice
 bot.hears('🎮 Play CheckerX', (ctx) => {
-    ctx.reply('👇 Click the blue **Play CheckerX** button at the bottom left to enter the Arena!');
+    ctx.reply('👇 Click the blue **Play CheckerX** button at bottom left to play!');
 });
 
 bot.launch();
 
-// Express Server Running on Render Port
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-    console.log(`Express Game UI Server running on port ${port}`);
+// ---------------- Real-time Matchmaking & Socket Logic ----------------
+const waitingPlayers = []; // Matchmaking Queue
+
+io.on('connection', (socket) => {
+    console.log('Player connected:', socket.id);
+
+    // Player joins matchmaking
+    socket.on('find_match', (data) => {
+        socket.stake = data.stake;
+        socket.playerName = data.name || 'Player';
+
+        // Check if there is an opponent waiting with the SAME STAKE
+        const opponentIndex = waitingPlayers.findIndex(p => p.stake === data.stake && p.id !== socket.id);
+
+        if (opponentIndex !== -1) {
+            // Found Match!
+            const opponent = waitingPlayers.splice(opponentIndex, 1)[0];
+            const roomId = `room_${socket.id}_${opponent.id}`;
+
+            socket.join(roomId);
+            opponent.join(roomId);
+
+            socket.roomId = roomId;
+            opponent.roomId = roomId;
+
+            // Assign Colors & Start Game
+            socket.emit('match_found', { role: 'red', opponentName: opponent.playerName, roomId });
+            opponent.emit('match_found', { role: 'black', opponentName: socket.playerName, roomId });
+        } else {
+            // No opponent yet -> Add to Waiting List
+            waitingPlayers.push(socket);
+        }
+    });
+
+    // Handle Moves Syncing between 2 Players
+    socket.on('make_move', (moveData) => {
+        if (socket.roomId) {
+            socket.to(socket.roomId).emit('opponent_moved', moveData);
+        }
+    });
+
+    // Cancel Matchmaking
+    socket.on('cancel_search', () => {
+        const index = waitingPlayers.findIndex(p => p.id === socket.id);
+        if (index !== -1) waitingPlayers.splice(index, 1);
+    });
+
+    socket.on('disconnect', () => {
+        const index = waitingPlayers.findIndex(p => p.id === socket.id);
+        if (index !== -1) waitingPlayers.splice(index, 1);
+    });
 });
 
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+const port = process.env.PORT || 3000;
+server.listen(port, () => {
+    console.log(`CheckerX Socket & Express Server running on port ${port}`);
+});
