@@ -15,7 +15,7 @@ if (!BOT_TOKEN) {
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -23,16 +23,18 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Pro In-Memory Database
 const users = {}; 
 
 function getUser(id, name) {
-    if (!users[id]) {
-        const initialBalance = (String(id) === ADMIN_ID) ? 1000000 : 100;
-        users[id] = { id: id, name: name || 'Player', balance: initialBalance };
+    const userId = id || 'guest';
+    if (!users[userId]) {
+        const initialBalance = (String(userId) === ADMIN_ID) ? 1000000 : 100;
+        users[userId] = { id: userId, name: name || 'Player', balance: initialBalance };
     } else if (name) {
-        users[id].name = name;
+        users[userId].name = name;
     }
-    return users[id];
+    return users[userId];
 }
 
 bot.start((ctx) => {
@@ -57,64 +59,75 @@ bot.hears('🎮 Play CheckerX', (ctx) => {
 
 bot.launch();
 
+// --- Bulletproof Matchmaking ---
 const waitingPlayers = [];
 const activeRooms = {};
 
 io.on('connection', (socket) => {
 
     socket.on('init_user', (userData) => {
-        if (!userData || !userData.id) return;
-        const user = getUser(userData.id, userData.first_name);
-        socket.userId = user.id;
-        socket.userName = user.name;
-        socket.emit('user_synced', { balance: user.balance, name: user.name });
+        try {
+            if (!userData || !userData.id) return;
+            const user = getUser(userData.id, userData.first_name);
+            socket.userId = user.id;
+            socket.userName = user.name;
+            socket.emit('user_synced', { balance: user.balance, name: user.name });
+        } catch (e) { console.error("Init Error:", e); }
     });
 
     socket.on('find_match', (data) => {
-        const userId = socket.userId || data.userId || 'guest';
-        const user = users[userId] || { balance: 100, name: 'Player' };
+        try {
+            const uid = socket.userId || (data && data.userId) || 'guest';
+            socket.userId = uid; // Ensure ID is attached
+            socket.userName = socket.userName || 'Player';
+            
+            const user = getUser(uid, socket.userName);
 
-        if (user.balance < 100) {
-            return socket.emit('error_message', 'Insufficient Balance! Please deposit coins to play.');
-        }
+            if (user.balance < 100) {
+                return socket.emit('error_message', 'Insufficient Balance! Please deposit coins to play.');
+            }
 
-        socket.stake = 100;
+            socket.stake = 100;
 
-        if (waitingPlayers.length > 0 && waitingPlayers[0].id !== socket.id) {
-            const opponent = waitingPlayers.shift();
-            const roomId = `room_${socket.id}_${opponent.id}`;
+            if (waitingPlayers.length > 0 && waitingPlayers[0].id !== socket.id) {
+                const opponent = waitingPlayers.shift();
+                const roomId = `room_${socket.id}_${opponent.id}`;
 
-            socket.join(roomId);
-            opponent.join(roomId);
+                socket.join(roomId);
+                opponent.join(roomId);
 
-            socket.roomId = roomId;
-            opponent.roomId = roomId;
+                socket.roomId = roomId;
+                opponent.roomId = roomId;
 
-            activeRooms[roomId] = {
-                p1: socket,
-                p2: opponent,
-                turn: 'red'
-            };
+                activeRooms[roomId] = { p1: socket, p2: opponent, turn: 'red' };
 
-            // 💰 Deduct 100 Coins from both players when match starts
-            users[socket.userId].balance -= 100;
-            users[opponent.userId].balance -= 100;
+                // 💰 Safe Deduction
+                const u1 = getUser(socket.userId);
+                const u2 = getUser(opponent.userId);
+                u1.balance -= 100;
+                u2.balance -= 100;
 
-            socket.emit('user_synced', { balance: users[socket.userId].balance, name: users[socket.userId].name });
-            opponent.emit('user_synced', { balance: users[opponent.userId].balance, name: users[opponent.userId].name });
+                socket.emit('user_synced', { balance: u1.balance, name: u1.name });
+                opponent.emit('user_synced', { balance: u2.balance, name: u2.name });
 
-            socket.emit('match_found', { role: 'red', opponentName: opponent.userName || 'Opponent', roomId });
-            opponent.emit('match_found', { role: 'black', opponentName: socket.userName || 'Opponent', roomId });
-        } else {
-            waitingPlayers.push(socket);
-        }
+                socket.emit('match_found', { role: 'red', opponentName: opponent.userName, roomId });
+                opponent.emit('match_found', { role: 'black', opponentName: socket.userName, roomId });
+            } else {
+                // Prevent duplicate waiting entries
+                if (!waitingPlayers.find(p => p.id === socket.id)) {
+                    waitingPlayers.push(socket);
+                }
+            }
+        } catch (e) { console.error("Matchmaking Error:", e); }
     });
 
     socket.on('make_move', (moveData) => {
-        if (socket.roomId && activeRooms[socket.roomId]) {
-            activeRooms[socket.roomId].turn = moveData.nextTurn;
-            socket.to(socket.roomId).emit('opponent_moved', moveData);
-        }
+        try {
+            if (socket.roomId && activeRooms[socket.roomId]) {
+                activeRooms[socket.roomId].turn = moveData.nextTurn;
+                socket.to(socket.roomId).emit('opponent_moved', moveData);
+            }
+        } catch (e) { console.error("Move Error:", e); }
     });
 
     socket.on('pass_turn', (data) => {
@@ -124,14 +137,23 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🏆 Reward Logic
+    // 🏆 Safe Reward Distribution
+    function handleWin(winnerSocket, loserSocket, isTimeoutOrDisconnect = false) {
+        if (!winnerSocket || !winnerSocket.userId) return;
+        const winner = getUser(winnerSocket.userId);
+        winner.balance += 180;
+        winnerSocket.emit('user_synced', { balance: winner.balance, name: winner.name });
+        
+        if (loserSocket && isTimeoutOrDisconnect) {
+            winnerSocket.emit(isTimeoutOrDisconnect); // Send specific event
+        }
+    }
+
     socket.on('game_won', () => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const loserSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
-
-            users[socket.userId].balance += 180;
-            socket.emit('user_synced', { balance: users[socket.userId].balance, name: users[socket.userId].name });
+            handleWin(socket, loserSocket);
             loserSocket.emit('you_lost_game');
             delete activeRooms[socket.roomId];
         }
@@ -141,11 +163,7 @@ io.on('connection', (socket) => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
-
-            users[winnerSocket.userId].balance += 180;
-            winnerSocket.emit('user_synced', { balance: users[winnerSocket.userId].balance, name: users[winnerSocket.userId].name });
-            
-            winnerSocket.emit('opponent_timed_out');
+            handleWin(winnerSocket, socket, 'opponent_timed_out');
             delete activeRooms[socket.roomId];
         }
     });
@@ -162,15 +180,11 @@ io.on('connection', (socket) => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
-
-            users[winnerSocket.userId].balance += 180;
-            winnerSocket.emit('user_synced', { balance: users[winnerSocket.userId].balance, name: users[winnerSocket.userId].name });
-
-            winnerSocket.emit('opponent_disconnected');
+            handleWin(winnerSocket, socket, 'opponent_disconnected');
             delete activeRooms[socket.roomId];
         }
     });
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => console.log(`CheckerX Running on port ${port}`));
+server.listen(port, () => console.log(`Pro CheckerX Server on ${port}`));
