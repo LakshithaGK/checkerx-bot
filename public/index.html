@@ -16,12 +16,11 @@
         .avatar { width: 42px; height: 42px; border-radius: 50%; border: 2px solid #00f2fe; }
         .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 8px 16px; border-radius: 25px; font-weight: 600; font-family: 'Orbitron', sans-serif; color: #00f2fe; text-shadow: 0 0 5px rgba(0,242,254,0.5); }
         
-        /* 🟢 Online Status CSS */
         .online-indicator { font-size: 11px; color: #8b949e; display: flex; align-items: center; gap: 5px; margin-top: 2px; font-weight: 600; }
         .blink-dot { width: 8px; height: 8px; background-color: #2ea043; border-radius: 50%; box-shadow: 0 0 8px #2ea043; animation: blinker 1.5s linear infinite; }
         @keyframes blinker { 50% { opacity: 0.3; } }
 
-        .screen { display: none; width: 100%; max-width: 420px; padding: 100px 20px 20px; text-align: center; }
+        .screen { display: none; width: 100%; max-width: 420px; padding: 90px 20px 20px; text-align: center; }
         .active-screen { display: flex; flex-direction: column; align-items: center; }
         
         h1 { font-family: 'Orbitron', sans-serif; color: #00f2fe; font-size: 28px; text-shadow: 0 0 10px rgba(0,242,254,0.4); margin-bottom: 5px;}
@@ -35,21 +34,25 @@
         .loader { border: 4px solid rgba(0, 242, 254, 0.2); border-top: 4px solid #00f2fe; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 30px 0; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        .board-wrapper { padding: 8px; background: linear-gradient(135deg, #8B5A2B, #5c3a21); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 0 10px rgba(0,0,0,0.8); margin-top: 10px; border: 2px solid #3e2723;}
+        .board-wrapper { padding: 8px; background: linear-gradient(135deg, #8B5A2B, #5c3a21); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 0 10px rgba(0,0,0,0.8); margin-top: 8px; border: 2px solid #3e2723;}
         canvas { border-radius: 8px; cursor: pointer; display: block; background: #3e2723; }
         .rotate-board { transform: rotate(180deg); }
         
-        .timer-container { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 320px; margin-bottom: 15px; background: rgba(22, 27, 34, 0.8); padding: 10px 20px; border-radius: 12px; border: 1px solid #30363d; box-shadow: 0 5px 15px rgba(0,0,0,0.5);}
+        .timer-container { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 320px; margin-bottom: 10px; background: rgba(22, 27, 34, 0.8); padding: 8px 16px; border-radius: 12px; border: 1px solid #30363d; box-shadow: 0 5px 15px rgba(0,0,0,0.5);}
         .timer-info { text-align: left; }
-        .timer-status { color:#00f2fe; font-weight:bold; font-family:'Orbitron'; font-size: 15px; margin-bottom: 2px;}
-        .timer-player { color:#c9d1d9; font-size: 13px; font-weight: 600;}
-        .timer-circle { width: 45px; height: 45px; border-radius: 50%; border: 3px solid #00f2fe; display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: 'Orbitron', sans-serif; font-size: 18px; color: #00f2fe; text-shadow: 0 0 5px #00f2fe; box-shadow: 0 0 10px rgba(0,242,254,0.3); }
+        .timer-status { color:#00f2fe; font-weight:bold; font-family:'Orbitron'; font-size: 14px; margin-bottom: 2px;}
+        .timer-player { color:#c9d1d9; font-size: 12px; font-weight: 600;}
+        .timer-circle { width: 40px; height: 40px; border-radius: 50%; border: 3px solid #00f2fe; display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: 'Orbitron', sans-serif; font-size: 16px; color: #00f2fe; text-shadow: 0 0 5px #00f2fe; box-shadow: 0 0 10px rgba(0,242,254,0.3); }
         .timer-danger { border-color: #ff4757 !important; color: #ff4757 !important; text-shadow: 0 0 5px #ff4757; box-shadow: 0 0 15px rgba(255,71,87,0.6); animation: pulse 0.5s infinite alternate; }
         @keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.15); } }
         
+        /* ⚠️ Non-blocking Notification Banner */
+        .warning-banner { width: 100%; max-width: 320px; background: rgba(255, 71, 87, 0.15); border: 1px solid #ff4757; color: #ff4757; padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 8px; display: none; text-align: center; box-shadow: 0 0 10px rgba(255,71,87,0.2); }
+        .match-warning-notice { width: 100%; max-width: 320px; background: rgba(255, 193, 7, 0.15); border: 1px solid #ffc107; color: #ffc107; padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 8px; text-align: center; }
+
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 14, 20, 0.95); z-index: 100; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
         .modal-content { background: #161b22; border: 1px solid #00f2fe; padding: 25px; border-radius: 20px; width: 95%; max-width: 360px; text-align: center; box-shadow: 0 10px 40px rgba(0,242,254,0.2); }
-        .rules-list li { margin-bottom: 8px; }
+        .rules-list li { margin-bottom: 8px; text-align: left; }
     </style>
 </head>
 <body>
@@ -59,7 +62,6 @@
             <img src="https://via.placeholder.com/42/00f2fe/000000?text=X" class="avatar">
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
                 <span id="userName" style="font-weight: 600; font-size: 15px;">Player</span>
-                <!-- 🟢 Online Status Tracker -->
                 <div class="online-indicator">
                     <div class="blink-dot"></div> 👤 <span id="onlineCount">1</span> Online
                 </div>
@@ -94,6 +96,12 @@
 
     <!-- Game Screen -->
     <div id="gameScreen" class="screen">
+        <!-- ⚠️ Warning Notice for Tab Closing -->
+        <div class="match-warning-notice">⚠️ Do not close or switch tabs, or you will lose!</div>
+        
+        <!-- 🔔 Live Notification Banner for Timeout Warning -->
+        <div id="warningBanner" class="warning-banner">⚠️ Warning: You missed your turn! One more miss = Defeat.</div>
+
         <div class="timer-container">
             <div class="timer-info">
                 <div id="statusText" class="timer-status">YOUR TURN</div>
@@ -115,16 +123,16 @@
         </div>
     </div>
 
-    <!-- Rules Modal -->
+    <!-- Rules Modal (English) -->
     <div id="rulesModal" class="modal">
         <div class="modal-content">
             <h3 style="color: #00f2fe; font-family: 'Orbitron'; margin-top:0;">📜 PRO RULES</h3>
-            <ul class="rules-list" style="text-align: left; font-size: 13px; color: #c9d1d9; line-height: 1.6; padding-left: 15px;">
-                <li><b>Majority Capture:</b> වැඩිම ඉත්තන් ගණනක් කැපිය හැකි පාර අනිවාර්යයෙන්ම තෝරාගත යුතුය.</li>
-                <li><b>King Movement 👑:</b> King ට පියාඹන්න පුළුවන්, නමුත් ඉත්තෙක් කැපූ පසු ඒ ඉත්තාට පිටුපස කොටුවේ නැවතිය යුතුය.</li>
-                <li><b>Time Out Loss:</b> අදින්න තත්පර 30 යි. එක් වරකට වඩා මිස් වුවහොත් Match එක පරාද වේ.</li>
-                <li><b>Disconnect Loss:</b> Connection lost වුවහොත් හෝ Close කළහොත් Auto-Loss වේ.</li>
-                <li><b>Economy & Fees:</b> දිනන අයට 80% Profit එකක් (180 Coins) ලැබේ. (Platform Network fee ලෙස 20 Coins කැපේ).</li>
+            <ul class="rules-list" style="font-size: 13px; color: #c9d1d9; line-height: 1.5; padding-left: 15px;">
+                <li><b>Majority Capture:</b> You must choose the path that captures the maximum number of pieces.</li>
+                <li><b>King Movement 👑:</b> Kings can fly across multiple squares, but must land safely immediately behind a captured piece.</li>
+                <li><b>Time Out Loss:</b> 30 seconds per turn. Missing 2 turns in a row results in match forfeiture.</li>
+                <li><b>Disconnect Loss:</b> Closing the tab or losing connection results in an automatic loss.</li>
+                <li><b>Economy & Fees:</b> Winner receives 180 X Coins (80% profit, 20 coins platform fee).</li>
             </ul>
             <button class="btn-primary" onclick="document.getElementById('rulesModal').style.display='none'">GOT IT</button>
         </div>
@@ -158,7 +166,6 @@
 
         socket.emit('init_user', tgUser);
 
-        // 🟢 Update Online Counter Live
         socket.on('online_count', (count) => {
             const countEl = document.getElementById('onlineCount');
             if (countEl) countEl.innerText = count;
@@ -194,6 +201,7 @@
             timeOutCount = 0;
             isMultiJumping = false;
             selectedPiece = null;
+            document.getElementById('warningBanner').style.display = 'none'; // Reset warning banner
             navTo('gameScreen');
             setupInitialBoard();
             calculateMandatoryPieces();
@@ -229,7 +237,7 @@
 
         socket.on('opponent_disconnected', () => showEndGame(true, "Opponent Disconnected! +180 Coins 🎉"));
         socket.on('opponent_timed_out', () => showEndGame(true, "Opponent Missed Turns! +180 Coins 🎉"));
-        socket.on('you_lost_game', () => showEndGame(false, "You Lost! All your pieces were captured. ❌"));
+        socket.on('you_lost_game', () => showEndGame(false, "Defeat! All your pieces were captured or time expired. ❌"));
 
         function startTurnTimer() {
             clearInterval(timerInterval);
@@ -265,11 +273,16 @@
         function handleTurnTimeout() {
             if (currentTurn === myRole) {
                 timeOutCount++;
+                const banner = document.getElementById('warningBanner');
+                
                 if (timeOutCount >= 2) {
                     socket.emit('timeout_loss');
                     showEndGame(false, "Match Lost! Missed 2 turns in a row. ❌");
                 } else {
-                    alert("⚠️ WARNING: You missed your turn! Miss one more and you will lose.");
+                    // 🔔 Show Non-blocking Notification Banner instead of blocking alert()
+                    banner.innerText = "⚠️ WARNING: You missed your turn! One more miss = Defeat.";
+                    banner.style.display = "block";
+
                     currentTurn = (myRole === 'red') ? 'black' : 'red';
                     isMultiJumping = false; selectedPiece = null; legalMoves = []; mandatoryPieces = [];
                     socket.emit('pass_turn', { nextTurn: currentTurn });
@@ -355,7 +368,6 @@
             }
         }
 
-        // PERFECT BRAZILIAN CAPTURE ENGINE (UNTOUCHED)
         function getPiecePaths(board, r, c, p, visited = []) {
             let paths = [];
             let dirs = [[-1,-1], [-1,1], [1,-1], [1,1]];
@@ -419,7 +431,7 @@
             if (allPaths.length > 0) {
                 let maxCaps = Math.max(...allPaths.map(p => p.caps));
                 allPaths.filter(p => p.caps === maxCaps).forEach(p => {
-                    if (!mandatoryPieces.some(m => m.r === p.from.r && m.c === p.from.c)) {
+                    if (!mandatoryPieces.some(m => m.r === p.from.r && m.c === p.from.r)) {
                         mandatoryPieces.push(p.from);
                     }
                 });
