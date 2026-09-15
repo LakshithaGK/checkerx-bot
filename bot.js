@@ -96,6 +96,13 @@ io.on('connection', (socket) => {
                 turn: 'red'
             };
 
+            // 💰 Deduct 100 Coins from both players when match starts
+            users[socket.userId].balance -= 100;
+            users[opponent.userId].balance -= 100;
+
+            socket.emit('user_synced', { balance: users[socket.userId].balance, name: users[socket.userId].name });
+            opponent.emit('user_synced', { balance: users[opponent.userId].balance, name: users[opponent.userId].name });
+
             socket.emit('match_found', { role: 'red', opponentName: opponent.userName || 'Opponent', roomId });
             opponent.emit('match_found', { role: 'black', opponentName: socket.userName || 'Opponent', roomId });
         } else {
@@ -117,9 +124,28 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 🏆 Reward Logic
+    socket.on('game_won', () => {
+        if (socket.roomId && activeRooms[socket.roomId]) {
+            const room = activeRooms[socket.roomId];
+            const loserSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
+
+            users[socket.userId].balance += 180;
+            socket.emit('user_synced', { balance: users[socket.userId].balance, name: users[socket.userId].name });
+            loserSocket.emit('you_lost_game');
+            delete activeRooms[socket.roomId];
+        }
+    });
+
     socket.on('timeout_loss', () => {
         if (socket.roomId && activeRooms[socket.roomId]) {
-            socket.to(socket.roomId).emit('opponent_timed_out');
+            const room = activeRooms[socket.roomId];
+            const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
+
+            users[winnerSocket.userId].balance += 180;
+            winnerSocket.emit('user_synced', { balance: users[winnerSocket.userId].balance, name: users[winnerSocket.userId].name });
+            
+            winnerSocket.emit('opponent_timed_out');
             delete activeRooms[socket.roomId];
         }
     });
@@ -134,7 +160,13 @@ io.on('connection', (socket) => {
         if (index !== -1) waitingPlayers.splice(index, 1);
 
         if (socket.roomId && activeRooms[socket.roomId]) {
-            socket.to(socket.roomId).emit('opponent_disconnected');
+            const room = activeRooms[socket.roomId];
+            const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
+
+            users[winnerSocket.userId].balance += 180;
+            winnerSocket.emit('user_synced', { balance: users[winnerSocket.userId].balance, name: users[winnerSocket.userId].name });
+
+            winnerSocket.emit('opponent_disconnected');
             delete activeRooms[socket.roomId];
         }
     });
