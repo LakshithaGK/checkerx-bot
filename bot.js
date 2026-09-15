@@ -2,7 +2,7 @@ const { Telegraf } = require('telegraf');
 const http = require('http');
 
 // Initialize Telegram Bot
-const bot = new Telegraf(process.env.BOT_TOKEN || 'YOUR_BOT_TOKEN_HERE');
+const bot = new Telegraf(process.env.BOT_TOKEN || '8872491990:AAFHWz6LMI-UjhOVqGf1nPJZY-XtOrT52DE');
 
 bot.start((ctx) => ctx.reply('Welcome to CheckerX Bot! 🎮'));
 
