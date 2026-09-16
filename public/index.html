@@ -8,13 +8,13 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Poppins:wght@400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Poppins:wght@400;600&family=Roboto+Mono:wght@500;700&display=swap');
         * { box-sizing: border-box; user-select: none; }
         body { margin: 0; background: radial-gradient(circle at center, #1a1e29 0%, #0b0e14 100%); color: #fff; font-family: 'Poppins', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
         
         .top-bar { width: 100%; max-width: 420px; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; background: rgba(22, 27, 34, 0.9); position: fixed; top: 0; z-index: 10; border-bottom: 2px solid #00f2fe; box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2); }
         .avatar { width: 42px; height: 42px; border-radius: 50%; border: 2px solid #00f2fe; }
-        .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 8px 16px; border-radius: 25px; font-weight: 600; font-family: 'Orbitron', sans-serif; color: #00f2fe; text-shadow: 0 0 5px rgba(0,242,254,0.5); }
+        .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 8px 16px; border-radius: 25px; font-weight: 700; font-family: 'Roboto Mono', monospace; color: #00f2fe; text-shadow: 0 0 5px rgba(0,242,254,0.5); }
         
         .online-indicator { font-size: 11px; color: #8b949e; display: flex; align-items: center; gap: 5px; margin-top: 2px; font-weight: 600; }
         .blink-dot { width: 8px; height: 8px; background-color: #2ea043; border-radius: 50%; box-shadow: 0 0 8px #2ea043; animation: blinker 1.5s linear infinite; }
@@ -29,7 +29,7 @@
         .btn-primary:active { transform: scale(0.95); }
         .btn-secondary { background: transparent; color: #00f2fe; border: 2px solid #00f2fe; padding: 14px 24px; font-weight: 600; border-radius: 25px; cursor: pointer; margin-top: 12px; width: 85%; transition: 0.3s; }
         
-        .stake-box { background: rgba(22, 27, 34, 0.8); border: 2px solid #00f2fe; padding: 25px; border-radius: 20px; width: 85%; margin: 25px 0; color: #00f2fe; font-size: 22px; font-weight: bold; font-family: 'Orbitron', sans-serif; box-shadow: 0 0 25px rgba(0,242,254,0.3); }
+        .stake-box { background: rgba(22, 27, 34, 0.8); border: 2px solid #00f2fe; padding: 25px; border-radius: 20px; width: 85%; margin: 25px 0; color: #00f2fe; font-size: 24px; font-weight: bold; font-family: 'Roboto Mono', monospace; box-shadow: 0 0 25px rgba(0,242,254,0.3); }
         
         .loader { border: 4px solid rgba(0, 242, 254, 0.2); border-top: 4px solid #00f2fe; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 30px 0; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -42,7 +42,7 @@
         .timer-info { text-align: left; }
         .timer-status { color:#00f2fe; font-weight:bold; font-family:'Orbitron'; font-size: 14px; margin-bottom: 2px;}
         .timer-player { color:#c9d1d9; font-size: 12px; font-weight: 600;}
-        .timer-circle { width: 40px; height: 40px; border-radius: 50%; border: 3px solid #00f2fe; display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: 'Orbitron', sans-serif; font-size: 16px; color: #00f2fe; text-shadow: 0 0 5px #00f2fe; box-shadow: 0 0 10px rgba(0,242,254,0.3); }
+        .timer-circle { width: 40px; height: 40px; border-radius: 50%; border: 3px solid #00f2fe; display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: 'Roboto Mono', monospace; font-size: 16px; color: #00f2fe; text-shadow: 0 0 5px #00f2fe; box-shadow: 0 0 10px rgba(0,242,254,0.3); }
         .timer-danger { border-color: #ff4757 !important; color: #ff4757 !important; text-shadow: 0 0 5px #ff4757; box-shadow: 0 0 15px rgba(255,71,87,0.6); animation: pulse 0.5s infinite alternate; }
         @keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.15); } }
         
@@ -81,7 +81,7 @@
     <!-- Stake Screen -->
     <div id="stakeScreen" class="screen">
         <h2 style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom: 0;">MATCH STAKE</h2>
-        <div class="stake-box">💰 100 X Coins<br><span style="font-size: 14px; font-weight: normal; color: #8b949e;">($1.00)</span></div>
+        <div class="stake-box">💰 100 X Coins<br><span style="font-size: 14px; font-weight: normal; color: #8b949e; font-family: 'Poppins', sans-serif;">($1.00)</span></div>
         <button class="btn-primary" onclick="startMatchmaking()">FIND MATCH</button>
         <button class="btn-secondary" onclick="navTo('homeScreen')">BACK</button>
     </div>
@@ -90,7 +90,7 @@
     <div id="waitingScreen" class="screen">
         <h2 style="font-family: 'Orbitron'; color: #00f2fe;">Scanning Arena...</h2>
         <div class="loader"></div>
-        <p style="color: #c9d1d9;">Finding opponent for <b>100 X Coins</b></p>
+        <p style="color: #c9d1d9;">Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins</b></p>
         <button class="btn-secondary" style="border-color:#ff4757; color:#ff4757; margin-top:30px;" onclick="cancelMatchmaking()">CANCEL MATCHMAKING</button>
     </div>
 
@@ -118,7 +118,7 @@
     <div id="gameEndModal" class="modal">
         <div class="modal-content">
             <h1 id="endResultTitle" style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom:10px; font-size: 26px;">VICTORY!</h1>
-            <p id="endResultDesc" style="color: #c9d1d9; font-size: 14px; margin-bottom: 25px;">You won 180 X Coins</p>
+            <p id="endResultDesc" style="color: #c9d1d9; font-size: 14px; margin-bottom: 25px; font-family: 'Roboto Mono', monospace;">You won 180 X Coins</p>
             <button class="btn-primary" onclick="navTo('homeScreen'); document.getElementById('gameEndModal').style.display='none';">MAIN MENU</button>
         </div>
     </div>

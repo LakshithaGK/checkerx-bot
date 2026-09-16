@@ -7,8 +7,9 @@ const mongoose = require('mongoose');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const MONGO_URI = process.env.MONGO_URI; 
-const ADMIN_ID = "8739780042"; 
-const MATCH_LOG_CHANNEL_ID = "-1004321776706"; 
+const ADMIN_ID = "8739780042"; // 🔴 ඔයාගේ Admin ID එක
+const MATCH_LOG_CHANNEL_ID = "-1004321776706"; // 🔴 ඔයාගේ Private Channel ID එක 
+const ADMIN_GROUP_ID = "-1004321776706"; // 🔴 New Users ලා වැටෙන Channel එකත් මේකමයි
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing!");
@@ -19,10 +20,14 @@ mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ Successfully connected to MongoDB Atlas!"))
     .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
+// 🟢 අලුත් User Schema එක (Country, Language සහ Welcome Bonus 20ක් එක්ක)
 const userSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
     name: { type: String, default: 'Player' },
-    balance: { type: Number, default: 100 }
+    balance: { type: Number, default: 20 }, // 🎁 Welcome Bonus 20 Coins
+    country: { type: String, default: null },
+    language: { type: String, default: null },
+    registeredAt: { type: Date, default: Date.now }
 });
 
 const User = mongoose.model('User', userSchema);
@@ -40,7 +45,7 @@ async function getUser(id, name) {
     try {
         let user = await User.findOne({ id: userId });
         if (!user) {
-            const initialBalance = (userId === ADMIN_ID) ? 1000000 : 100;
+            const initialBalance = (userId === ADMIN_ID) ? 1000000 : 20;
             user = new User({ id: userId, name: name || 'Player', balance: initialBalance });
             await user.save();
         } else if (name && user.name !== name) {
@@ -49,44 +54,146 @@ async function getUser(id, name) {
         }
         return user;
     } catch (e) {
-        console.error("Database Error:", e);
-        return { id: userId, name: name || 'Player', balance: 100 };
+        return { id: userId, name: name || 'Player', balance: 20 };
     }
 }
 
+// --- 🟢 අලුත් BOT COMMANDS සහ REGISTRATION FLOW ---
+
 bot.start(async (ctx) => {
-    const user = await getUser(ctx.from.id, ctx.from.first_name);
-    const welcomeMsg = `👋 **Welcome to CheckerX Arena!** 🎮\n\n💰 **Your Balance:** ${user.balance.toLocaleString()} X Coins ($${(user.balance/100).toFixed(2)})`;
+    const userId = String(ctx.from.id);
+    let user = await User.findOne({ id: userId });
+
+    if (!user) {
+        // අලුත් යූසර් කෙනෙක් නම් රට අහනවා
+        return ctx.reply("🌍 **Welcome to CheckerX!**\nPlease select your country to continue:", Markup.inlineKeyboard([
+            [Markup.button.callback('🇧🇷 Brazil', 'country_br'), Markup.button.callback('🇱🇰 Sri Lanka', 'country_lk')],
+            [Markup.button.callback('🇺🇸 USA', 'country_us'), Markup.button.callback('🌍 Other', 'country_other')]
+        ]));
+    } else if (!user.language) {
+        // රට තෝරලා භාෂාව තෝරලා නැත්නම්
+        return sendLanguageSelection(ctx);
+    } else {
+        // ඔක්කොම තෝරලා නම් Main Menu එක දෙනවා
+        return sendMainMenu(ctx, user);
+    }
+});
+
+bot.action(/country_(.+)/, async (ctx) => {
+    const country = ctx.match[1];
+    const userId = String(ctx.from.id);
+    let user = await User.findOne({ id: userId });
+    
+    if (!user) {
+        user = new User({ id: userId, name: ctx.from.first_name, country: country });
+        await user.save();
+    } else {
+        user.country = country;
+        await user.save();
+    }
+    
+    ctx.deleteMessage();
+    sendLanguageSelection(ctx);
+});
+
+function sendLanguageSelection(ctx) {
+    ctx.reply("🗣 **Select your Language / Selecione seu idioma:**", Markup.inlineKeyboard([
+        [Markup.button.callback('🇬🇧 English', 'lang_en'), Markup.button.callback('🇵🇹 Português', 'lang_pt')]
+    ]));
+}
+
+bot.action(/lang_(.+)/, async (ctx) => {
+    const lang = ctx.match[1];
+    const userId = String(ctx.from.id);
+    let user = await User.findOne({ id: userId });
+    
+    user.language = lang;
+    await user.save();
+    ctx.deleteMessage();
+
+    // 🟢 ගෲප් එකට නොටිෆිකේෂන් එක යවනවා
+    try {
+        const totalUsers = await User.countDocuments();
+        const adminMsg = `🚨 **New Player Joined!** 🚨\n\n👤 **Name:** ${user.name}\n🆔 **ID:** \`${user.id}\`\n🌍 **Country:** ${user.country.toUpperCase()}\n🗣 **Language:** ${user.language.toUpperCase()}\n\n📊 **Total Players:** ${totalUsers} 📈`;
+        await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
+    } catch (error) {
+        console.log("Admin notification group error", error.message);
+    }
+
+    // Rules මැසේජ් එක යවනවා (භාෂාව අනුව)
+    const rulesMsg = lang === 'pt' ? 
+        `📜 *Regras do CheckerX:*\n1. Captura obrigatória.\n2. Timeout de 30s = Perda.\n3. Taxa de rede: 20%.\n\n🎁 *Você ganhou 20 X Coins de bônus!*` : 
+        `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 30s Timeout = Loss.\n3. Network Fee: 20%.\n\n🎁 *You received a 20 X Coins Welcome Bonus!*`;
+    
+    await ctx.replyWithMarkdown(rulesMsg);
+    sendMainMenu(ctx, user);
+});
+
+function sendMainMenu(ctx, user) {
+    const msg = user.language === 'pt' ? 
+        `🎮 **Menu Principal**\n💰 Saldo: ${user.balance} X Coins` : 
+        `🎮 **Main Menu**\n💰 Balance: ${user.balance} X Coins`;
+    
     const mainMenu = Markup.keyboard([
         ['🎮 Play CheckerX', '💰 Balance'],
         ['📥 Deposit', '📤 Withdrawal'],
-        ['🔗 Referral', '💬 Customer Support']
+        ['🔗 Referral', '💬 Support']
     ]).resize();
-    return ctx.replyWithMarkdown(welcomeMsg, mainMenu);
-});
+    ctx.reply(msg, mainMenu);
+}
 
-bot.hears('💰 Balance', async (ctx) => {
-    const user = await getUser(ctx.from.id, ctx.from.first_name);
-    ctx.reply(`💳 **Your Balance:** ${user.balance.toLocaleString()} X Coins`);
-});
-
-bot.hears('🎮 Play CheckerX', (ctx) => ctx.reply('👇 Click the blue **Play CheckerX** button at bottom left to play!'));
-bot.hears('📥 Deposit', (ctx) => ctx.reply('📥 **Deposit via:**\n1. Binance Pay\n2. USDT (TRC20)\n\nSend payment to Admin & use `/submit_deposit <TxID>`'));
-bot.command('submit_deposit', (ctx) => ctx.reply("✅ Deposit request submitted!"));
-
-bot.hears('📤 Withdrawal', async (ctx) => {
-    const user = await getUser(ctx.from.id);
-    const args = ctx.message.text.split(' ');
-    const amount = parseFloat(args[2]);
-    if (!args[1] || !amount || amount > user.balance) return ctx.reply("❌ Invalid amount or insufficient balance!");
-    user.balance -= amount;
-    await user.save();
-    ctx.reply("✅ Withdrawal request submitted successfully!");
-});
+bot.hears('🎮 Play CheckerX', (ctx) => ctx.reply('👇 Click the **Play CheckerX** button at bottom left to play!'));
 
 bot.hears('🔗 Referral', (ctx) => ctx.reply(`🔗 **Your Referral Link:**\nhttps://t.me/CheckerX_Bot?start=${ctx.from.id}`));
-bot.hears('💬 Customer Support', (ctx) => ctx.reply('💬 **Contact Admin:** @YourPersonalTelegramUsername'));
 
+// 🟢 Cyberpunk Balance
+bot.hears('💰 Balance', async (ctx) => {
+    const user = await User.findOne({ id: String(ctx.from.id) });
+    const balanceMsg = `
+🏦 *CHECKERX WALLET* 🏦
+━━━━━━━━━━━━━━━━━━
+👤 *User:* ${user.name}
+💰 *Balance:* \`${user.balance.toLocaleString()} X Coins\`
+💵 *Value:* \`$${(user.balance/100).toFixed(2)} USD\`
+━━━━━━━━━━━━━━━━━━
+⚡️ Play matches to earn more!`;
+    ctx.replyWithMarkdown(balanceMsg);
+});
+
+// 🟢 Deposit Menu (Crypto Options)
+bot.hears('📥 Deposit', (ctx) => {
+    ctx.reply("📥 *SELECT DEPOSIT METHOD*\n\n_Minimum Deposit: $2.00 (200 X Coins)_\nChoose your preferred crypto network:", {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔶 Binance Pay', 'dep_binance'), Markup.button.callback('💵 USDT (TRC20)', 'dep_usdt')],
+            [Markup.button.callback('🔴 TRX (TRC20)', 'dep_trx'), Markup.button.callback('🟣 Solana', 'dep_sol')],
+            [Markup.button.callback('✖️ XRP', 'dep_xrp')]
+        ])
+    });
+});
+
+bot.action(/dep_(.+)/, (ctx) => {
+    const method = ctx.match[1].toUpperCase();
+    
+    // 🔴 ඔයාගේ ඇඩ්‍රස් ටික මෙතන වෙනස් කරගන්න පුළුවන් පස්සේ
+    let address = 'Your_Wallet_Address_Here';
+    if(method === 'BINANCE') address = 'Pay ID: 123456789'; 
+
+    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend to this address:\n\`${address}\`\n\n⚠️ *Action Required:*\nAfter sending the payment, please send a screenshot and your Transaction ID (TxID) to our Customer Support to get your coins credited.\n\n_Minimum: $2.00_`);
+});
+
+// 🟢 Withdrawal Menu
+bot.hears('📤 Withdrawal', (ctx) => {
+    ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n_Minimum Withdrawal: $3.00 (300 X Coins)_\n\nTo withdraw, please send a message to Customer Support in this format:\n\n`WITHDRAW [Amount] [Your Address] [Method]`\n\nExample:\n`WITHDRAW 300 Txxxxxxxx... USDT-TRC20`");
+});
+
+// 🟢 Support
+bot.hears('💬 Support', (ctx) => ctx.reply("💬 **Customer Support**\nClick below to chat directly with an Admin for deposits, withdrawals, or issues.", Markup.inlineKeyboard([
+    // 🔴 ඔයාගේ ටෙලිග්‍රෑම් යූසර්නෙම් එක (උදා: @LakshithaGK) මෙතන දාන්න
+    [Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')] 
+])));
+
+// Admin Add Coins Command
 bot.command('addcoins', async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
@@ -97,7 +204,7 @@ bot.command('addcoins', async (ctx) => {
         if (user) {
             user.balance += amount;
             await user.save();
-            bot.telegram.sendMessage(targetId, `🎉 ${amount} X Coins added!`);
+            bot.telegram.sendMessage(targetId, `🎉 ${amount} X Coins added to your account!`);
             ctx.reply(`✅ Added!`);
         } else {
             ctx.reply(`❌ User not found in database!`);
@@ -109,6 +216,10 @@ bot.command('addcoins', async (ctx) => {
 
 bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.error("Bot Error:", err.message));
 
+
+// ==========================================
+// --- MULTIPLAYER ENGINE (නොවෙනස්ව තබා ඇත) ---
+// ==========================================
 const waitingPlayers = [];
 const activeRooms = {};
 let onlineUsersCount = 0; 
@@ -201,7 +312,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🟢 Improved Timeout Handling (Works for both players securely)
     socket.on('timeout_loss', async () => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
