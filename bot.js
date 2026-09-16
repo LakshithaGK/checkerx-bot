@@ -8,8 +8,8 @@ const mongoose = require('mongoose');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const MONGO_URI = process.env.MONGO_URI; 
 const ADMIN_ID = "8739780042"; // 🔴 ඔයාගේ Admin ID එක
-const MATCH_LOG_CHANNEL_ID = "-1004321776706"; // 🔴 ඔයාගේ Private Channel ID එක 
-const ADMIN_GROUP_ID = "-1004321776706"; // 🔴 New Users ලා වැටෙන Channel එකත් මේකමයි
+const MATCH_LOG_CHANNEL_ID = "-1004321776706"; // 🔴 Match logs වැටෙන Channel ID එක 
+const ADMIN_GROUP_ID = "-1004321776706"; // 🔴 New Users/Deposits/Withdrawals වැටෙන Group ID එක
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing!");
@@ -20,11 +20,10 @@ mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ Successfully connected to MongoDB Atlas!"))
     .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
-// 🟢 අලුත් User Schema එක (Country, Language සහ Welcome Bonus 20ක් එක්ක)
 const userSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
     name: { type: String, default: 'Player' },
-    balance: { type: Number, default: 20 }, // 🎁 Welcome Bonus 20 Coins
+    balance: { type: Number, default: 20 }, 
     country: { type: String, default: null },
     language: { type: String, default: null },
     registeredAt: { type: Date, default: Date.now }
@@ -58,23 +57,24 @@ async function getUser(id, name) {
     }
 }
 
-// --- 🟢 අලුත් BOT COMMANDS සහ REGISTRATION FLOW ---
+// 🟢 අලුතෙන් එකතු කළ State Object එක (Step-by-step වැඩ කරන්න)
+const userStates = {}; 
+
+// --- BOT COMMANDS ---
 
 bot.start(async (ctx) => {
     const userId = String(ctx.from.id);
     let user = await User.findOne({ id: userId });
+    delete userStates[userId]; // Reset any ongoing steps
 
     if (!user) {
-        // අලුත් යූසර් කෙනෙක් නම් රට අහනවා
         return ctx.reply("🌍 **Welcome to CheckerX!**\nPlease select your country to continue:", Markup.inlineKeyboard([
             [Markup.button.callback('🇧🇷 Brazil', 'country_br'), Markup.button.callback('🇱🇰 Sri Lanka', 'country_lk')],
             [Markup.button.callback('🇺🇸 USA', 'country_us'), Markup.button.callback('🌍 Other', 'country_other')]
         ]));
     } else if (!user.language) {
-        // රට තෝරලා භාෂාව තෝරලා නැත්නම්
         return sendLanguageSelection(ctx);
     } else {
-        // ඔක්කොම තෝරලා නම් Main Menu එක දෙනවා
         return sendMainMenu(ctx, user);
     }
 });
@@ -111,16 +111,12 @@ bot.action(/lang_(.+)/, async (ctx) => {
     await user.save();
     ctx.deleteMessage();
 
-    // 🟢 ගෲප් එකට නොටිෆිකේෂන් එක යවනවා
     try {
         const totalUsers = await User.countDocuments();
         const adminMsg = `🚨 **New Player Joined!** 🚨\n\n👤 **Name:** ${user.name}\n🆔 **ID:** \`${user.id}\`\n🌍 **Country:** ${user.country.toUpperCase()}\n🗣 **Language:** ${user.language.toUpperCase()}\n\n📊 **Total Players:** ${totalUsers} 📈`;
         await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
-    } catch (error) {
-        console.log("Admin notification group error", error.message);
-    }
+    } catch (error) { console.log("Admin group error", error.message); }
 
-    // Rules මැසේජ් එක යවනවා (භාෂාව අනුව)
     const rulesMsg = lang === 'pt' ? 
         `📜 *Regras do CheckerX:*\n1. Captura obrigatória.\n2. Timeout de 30s = Perda.\n3. Taxa de rede: 20%.\n\n🎁 *Você ganhou 20 X Coins de bônus!*` : 
         `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 30s Timeout = Loss.\n3. Network Fee: 20%.\n\n🎁 *You received a 20 X Coins Welcome Bonus!*`;
@@ -130,10 +126,7 @@ bot.action(/lang_(.+)/, async (ctx) => {
 });
 
 function sendMainMenu(ctx, user) {
-    const msg = user.language === 'pt' ? 
-        `🎮 **Menu Principal**\n💰 Saldo: ${user.balance} X Coins` : 
-        `🎮 **Main Menu**\n💰 Balance: ${user.balance} X Coins`;
-    
+    const msg = user.language === 'pt' ? `🎮 **Menu Principal**\n💰 Saldo: ${user.balance} X Coins` : `🎮 **Main Menu**\n💰 Balance: ${user.balance} X Coins`;
     const mainMenu = Markup.keyboard([
         ['🎮 Play CheckerX', '💰 Balance'],
         ['📥 Deposit', '📤 Withdrawal'],
@@ -144,74 +137,174 @@ function sendMainMenu(ctx, user) {
 
 bot.hears('🎮 Play CheckerX', (ctx) => ctx.reply('👇 Click the **Play CheckerX** button at bottom left to play!'));
 
-bot.hears('🔗 Referral', (ctx) => ctx.reply(`🔗 **Your Referral Link:**\nhttps://t.me/CheckerX_Bot?start=${ctx.from.id}`));
+// 🟢 ලස්සන කරපු Referral Link එක
+bot.hears('🔗 Referral', (ctx) => {
+    // 🔴 'CheckerX_Bot' වෙනුවට ඔයාගේ ඇත්ත Bot Username එක දාන්න (උදා: @mage_checker_bot නම් mage_checker_bot දාන්න)
+    const botUsername = 'CheckerX_Bot'; 
+    
+    ctx.replyWithMarkdown(`🔗 *YOUR REFERRAL LINK*\nShare this link with your friends to invite them to the Arena!\n\n👉 \`https://t.me/${botUsername}?start=${ctx.from.id}\``);
+});
 
-// 🟢 Cyberpunk Balance
 bot.hears('💰 Balance', async (ctx) => {
     const user = await User.findOne({ id: String(ctx.from.id) });
-    const balanceMsg = `
-🏦 *CHECKERX WALLET* 🏦
-━━━━━━━━━━━━━━━━━━
-👤 *User:* ${user.name}
-💰 *Balance:* \`${user.balance.toLocaleString()} X Coins\`
-💵 *Value:* \`$${(user.balance/100).toFixed(2)} USD\`
-━━━━━━━━━━━━━━━━━━
-⚡️ Play matches to earn more!`;
+    const balanceMsg = `🏦 *CHECKERX WALLET* 🏦\n━━━━━━━━━━━━━━━━━━\n👤 *User:* ${user.name}\n💰 *Balance:* \`${user.balance.toLocaleString()} X Coins\`\n💵 *Value:* \`$${(user.balance/100).toFixed(2)} USD\`\n━━━━━━━━━━━━━━━━━━\n⚡️ Play matches to earn more!`;
     ctx.replyWithMarkdown(balanceMsg);
 });
 
-// 🟢 Deposit Menu (Crypto Options)
+// ==========================================
+// --- 🟢 STEP-BY-STEP DEPOSIT SYSTEM ---
+// ==========================================
 bot.hears('📥 Deposit', (ctx) => {
+    delete userStates[ctx.from.id];
     ctx.reply("📥 *SELECT DEPOSIT METHOD*\n\n_Minimum Deposit: $2.00 (200 X Coins)_\nChoose your preferred crypto network:", {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.callback('🔶 Binance Pay', 'dep_binance'), Markup.button.callback('💵 USDT (TRC20)', 'dep_usdt')],
-            [Markup.button.callback('🔴 TRX (TRC20)', 'dep_trx'), Markup.button.callback('🟣 Solana', 'dep_sol')],
-            [Markup.button.callback('✖️ XRP', 'dep_xrp')]
+            [Markup.button.callback('🔴 TRX (TRC20)', 'dep_trx'), Markup.button.callback('🟣 Solana', 'dep_sol')]
         ])
     });
 });
 
-bot.action(/dep_(.+)/, (ctx) => {
+bot.action(/dep_(.+)/, async (ctx) => {
     const method = ctx.match[1].toUpperCase();
+    const userId = ctx.from.id;
     
-    // 🔴 ඔයාගේ ඇඩ්‍රස් ටික මෙතන වෙනස් කරගන්න පුළුවන් පස්සේ
+    // 🔴 ඔයාගේ ඇඩ්‍රස් ටික මෙතන අනිවාර්යයෙන් වෙනස් කරන්න
     let address = 'Your_Wallet_Address_Here';
     if(method === 'BINANCE') address = 'Pay ID: 123456789'; 
 
-    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend to this address:\n\`${address}\`\n\n⚠️ *Action Required:*\nAfter sending the payment, please send a screenshot and your Transaction ID (TxID) to our Customer Support to get your coins credited.\n\n_Minimum: $2.00_`);
+    // මතක තියාගන්නවා යූසර් ඉන්නේ Deposit Amount අහන Step එකේ කියලා
+    userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount' };
+
+    await ctx.answerCbQuery();
+    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend your payment to this address:\n\`${address}\`\n\n👇 **How much are you depositing? (in USD)**\n_(Please type the exact dollar amount below. E.g: 5.50)_`);
 });
 
-// 🟢 Withdrawal Menu
-bot.hears('📤 Withdrawal', (ctx) => {
-    ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n_Minimum Withdrawal: $3.00 (300 X Coins)_\n\nTo withdraw, please send a message to Customer Support in this format:\n\n`WITHDRAW [Amount] [Your Address] [Method]`\n\nExample:\n`WITHDRAW 300 Txxxxxxxx... USDT-TRC20`");
+
+// ==========================================
+// --- 🟢 STEP-BY-STEP WITHDRAWAL SYSTEM ---
+// ==========================================
+bot.hears('📤 Withdrawal', async (ctx) => {
+    const userId = ctx.from.id;
+    const user = await User.findOne({ id: String(userId) });
+
+    if (user.balance < 300) {
+        return ctx.replyWithMarkdown(`❌ **Insufficient Balance**\nYour balance is \`${user.balance} X Coins\`.\n_Minimum withdrawal is 300 X Coins ($3.00)._`);
+    }
+
+    userStates[userId] = { action: 'withdraw', step: 'awaiting_amount' };
+    ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 **How many X Coins do you want to withdraw?**\n_(Please type the amount below. E.g: 350)_");
 });
 
-// 🟢 Support
-bot.hears('💬 Support', (ctx) => ctx.reply("💬 **Customer Support**\nClick below to chat directly with an Admin for deposits, withdrawals, or issues.", Markup.inlineKeyboard([
-    // 🔴 ඔයාගේ ටෙලිග්‍රෑම් යූසර්නෙම් එක (උදා: @LakshithaGK) මෙතන දාන්න
-    [Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')] 
+bot.action(/with_(.+)/, async (ctx) => {
+    const userId = ctx.from.id;
+    const state = userStates[userId];
+    
+    if (!state || state.step !== 'awaiting_method') return ctx.answerCbQuery("Expired request. Please start again.", { show_alert: true });
+
+    state.method = ctx.match[1].toUpperCase();
+    state.step = 'awaiting_address';
+    
+    await ctx.answerCbQuery();
+    ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n📍 **Please paste your Wallet Address / Pay ID below:**`);
+});
+
+bot.hears('💬 Support', (ctx) => ctx.reply("💬 **Customer Support**\nClick below to chat directly with an Admin.", Markup.inlineKeyboard([
+    [Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')] // 🔴 ඔයාගේ Username එක දාන්න
 ])));
 
-// Admin Add Coins Command
+// Admin Add Coins
 bot.command('addcoins', async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
-    const targetId = args[1];
-    const amount = parseFloat(args[2]);
+    const targetId = args[1], amount = parseFloat(args[2]);
     try {
         let user = await User.findOne({ id: targetId });
         if (user) {
-            user.balance += amount;
-            await user.save();
+            user.balance += amount; await user.save();
             bot.telegram.sendMessage(targetId, `🎉 ${amount} X Coins added to your account!`);
             ctx.reply(`✅ Added!`);
-        } else {
-            ctx.reply(`❌ User not found in database!`);
-        }
-    } catch (e) {
-        ctx.reply(`❌ Error adding coins.`);
+        } else ctx.reply(`❌ User not found!`);
+    } catch (e) { ctx.reply(`❌ Error.`); }
+});
+
+// ==========================================
+// 🟢 TEXT HANDLER (Typing Inputs අල්ලගන්න එක)
+// ==========================================
+bot.on('text', async (ctx, next) => {
+    const userId = ctx.from.id;
+    const text = ctx.message.text;
+    const state = userStates[userId];
+
+    // යූසර් වෙන Main Menu Button එකක් එබුවොත් Flow එක කැන්සල් වෙනවා
+    if (['🎮 Play CheckerX', '💰 Balance', '📥 Deposit', '📤 Withdrawal', '🔗 Referral', '💬 Support'].includes(text)) {
+        delete userStates[userId];
+        return next(); 
     }
+
+    if (!state) return next(); // කිසිම Step එකක නැත්නම් අතාරිනවා
+
+    // --- DEPOSIT FLOW ---
+    if (state.action === 'deposit' && state.step === 'awaiting_amount') {
+        const amount = parseFloat(text);
+        if (isNaN(amount) || amount < 2) return ctx.reply("❌ Invalid amount. Minimum deposit is $2.00. Please enter a valid number:");
+        
+        state.amount = amount;
+        state.step = 'awaiting_txid';
+        return ctx.replyWithMarkdown(`✅ Amount saved: **$${amount}**\n\n🔗 Now, please paste your **Transaction ID (TxID)** below:`);
+    }
+
+    if (state.action === 'deposit' && state.step === 'awaiting_txid') {
+        const txid = text;
+        const user = await User.findOne({ id: String(userId) });
+        
+        const adminMsg = `📥 **NEW DEPOSIT ALERT** 📥\n\n👤 **User:** ${user.name}\n🆔 **ID:** \`${user.id}\`\n💸 **Amount:** $${state.amount}\n🏦 **Method:** ${state.method}\n🔗 **TxID:** \`${txid}\``;
+        bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.log(e));
+
+        ctx.reply("✅ **Deposit Request Submitted!**\nAdmins will verify your TxID and credit your X Coins shortly.");
+        delete userStates[userId];
+        return;
+    }
+
+    // --- WITHDRAW FLOW ---
+    if (state.action === 'withdraw' && state.step === 'awaiting_amount') {
+        const amount = parseFloat(text);
+        if (isNaN(amount) || amount < 300) return ctx.reply("❌ Invalid amount. Minimum withdrawal is 300 X Coins. Try again:");
+        
+        const user = await User.findOne({ id: String(userId) });
+        if (user.balance < amount) return ctx.reply(`❌ Insufficient balance! Your balance is ${user.balance} X Coins.`);
+        
+        state.amount = amount;
+        state.step = 'awaiting_method';
+        
+        return ctx.reply("✅ Amount confirmed.\n\n💳 Please select your withdrawal method:", Markup.inlineKeyboard([
+            [Markup.button.callback('🔶 Binance Pay', 'with_binance'), Markup.button.callback('💵 USDT (TRC20)', 'with_usdt')],
+            [Markup.button.callback('🔴 TRX (TRC20)', 'with_trx'), Markup.button.callback('🟣 Solana', 'with_sol')]
+        ]));
+    }
+
+    if (state.action === 'withdraw' && state.step === 'awaiting_address') {
+        const address = text;
+        const user = await User.findOne({ id: String(userId) });
+        
+        if (user.balance < state.amount) {
+            delete userStates[userId];
+            return ctx.reply("❌ Error: Insufficient balance.");
+        }
+
+        // 🟢 ඔටෝ සල්ලි කැපීම!
+        user.balance -= state.amount;
+        await user.save();
+
+        const adminMsg = `📤 **NEW WITHDRAWAL ALERT** 📤\n\n👤 **User:** ${user.name}\n🆔 **ID:** \`${user.id}\`\n💸 **Amount:** ${state.amount} X Coins ($${(state.amount/100).toFixed(2)})\n🏦 **Method:** ${state.method}\n📍 **Address:** \`${address}\``;
+        bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.log(e));
+
+        ctx.replyWithMarkdown(`✅ **Withdrawal Successful!**\n\`${state.amount} X Coins\` have been automatically deducted from your balance. The funds will be sent to your address shortly.\n\n💰 **New Balance:** ${user.balance} X Coins`);
+        delete userStates[userId];
+        return;
+    }
+
+    return next();
 });
 
 bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.error("Bot Error:", err.message));
