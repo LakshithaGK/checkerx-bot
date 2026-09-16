@@ -339,7 +339,7 @@ io.on('connection', (socket) => {
 
             if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
 
-            const roomId = `room_${Math.random().toString(36.substring(2, 9))}_${Date.now()}`;
+            const roomId = `room_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
             socket.join(roomId);
             socket.roomId = roomId;
             privateRooms[roomId] = socket;
