@@ -10,78 +10,116 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Poppins:wght@400;600&family=Roboto+Mono:wght@500;700&display=swap');
         * { box-sizing: border-box; user-select: none; }
-        body { margin: 0; background: radial-gradient(circle at center, #1a1e29 0%, #0b0e14 100%); color: #fff; font-family: 'Poppins', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+        body { margin: 0; background: radial-gradient(circle at center, #1a1e29 0%, #0b0e14 100%); color: #fff; font-family: 'Poppins', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow-hidden; }
         
-        .top-bar { width: 100%; max-width: 420px; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; background: rgba(22, 27, 34, 0.9); position: fixed; top: 0; z-index: 10; border-bottom: 2px solid #00f2fe; box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2); }
-        .avatar { width: 42px; height: 42px; border-radius: 50%; border: 2px solid #00f2fe; }
-        .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 8px 16px; border-radius: 25px; font-weight: 700; font-family: 'Roboto Mono', monospace; color: #00f2fe; text-shadow: 0 0 5px rgba(0,242,254,0.5); }
-        
+        .top-bar { width: 100%; max-width: 420px; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(22, 27, 34, 0.95); position: fixed; top: 0; z-index: 10; border-bottom: 2px solid #00f2fe; box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2); }
+        .user-info-box { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #00f2fe; }
+        .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-family: 'Roboto Mono', monospace; color: #00f2fe; font-size: 13px; text-shadow: 0 0 5px rgba(0,242,254,0.5); }
+        .winrate-badge { background: rgba(241, 196, 15, 0.15); border: 1px solid #f1c40f; color: #f1c40f; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-family: 'Roboto Mono', monospace; font-weight: bold; text-align: center; }
+
         .online-indicator { font-size: 11px; color: #8b949e; display: flex; align-items: center; gap: 5px; margin-top: 2px; font-weight: 600; }
-        .blink-dot { width: 8px; height: 8px; background-color: #2ea043; border-radius: 50%; box-shadow: 0 0 8px #2ea043; animation: blinker 1.5s linear infinite; }
+        .blink-dot { width: 7px; height: 7px; background-color: #2ea043; border-radius: 50%; box-shadow: 0 0 8px #2ea043; animation: blinker 1.5s linear infinite; }
         @keyframes blinker { 50% { opacity: 0.3; } }
 
-        .screen { display: none; width: 100%; max-width: 420px; padding: 90px 20px 20px; text-align: center; }
+        .screen { display: none; width: 100%; max-width: 420px; padding: 85px 15px 20px; text-align: center; overflow-y: auto; max-height: 100vh; }
         .active-screen { display: flex; flex-direction: column; align-items: center; }
         
-        h1 { font-family: 'Orbitron', sans-serif; color: #00f2fe; font-size: 28px; text-shadow: 0 0 10px rgba(0,242,254,0.4); margin-bottom: 5px;}
+        h1 { font-family: 'Orbitron', sans-serif; color: #00f2fe; font-size: 26px; text-shadow: 0 0 10px rgba(0,242,254,0.4); margin-bottom: 2px;}
         
-        .btn-primary { background: linear-gradient(135deg, #00f2fe, #4facfe); color: #000; border: none; padding: 15px 30px; font-weight: 700; font-family: 'Orbitron', sans-serif; font-size: 15px; border-radius: 30px; cursor: pointer; margin-top: 12px; width: 85%; box-shadow: 0 0 15px rgba(0,242,254,0.4); transition: transform 0.1s; }
+        .btn-primary { background: linear-gradient(135deg, #00f2fe, #4facfe); color: #000; border: none; padding: 14px 25px; font-weight: 700; font-family: 'Orbitron', sans-serif; font-size: 14px; border-radius: 30px; cursor: pointer; margin-top: 10px; width: 90%; box-shadow: 0 0 15px rgba(0,242,254,0.4); transition: transform 0.1s; }
         .btn-primary:active { transform: scale(0.95); }
-        .btn-secondary { background: transparent; color: #00f2fe; border: 2px solid #00f2fe; padding: 12px 24px; font-weight: 600; border-radius: 25px; cursor: pointer; margin-top: 10px; width: 85%; transition: 0.3s; }
+        .btn-secondary { background: transparent; color: #00f2fe; border: 2px solid #00f2fe; padding: 10px 20px; font-weight: 600; border-radius: 25px; cursor: pointer; margin-top: 8px; width: 90%; transition: 0.3s; font-size: 13px; }
         
-        .stake-box { background: rgba(22, 27, 34, 0.8); border: 2px solid #00f2fe; padding: 25px; border-radius: 20px; width: 85%; margin: 25px 0; color: #00f2fe; font-size: 24px; font-weight: bold; font-family: 'Roboto Mono', monospace; box-shadow: 0 0 25px rgba(0,242,254,0.3); }
+        .stake-box { background: rgba(22, 27, 34, 0.8); border: 2px solid #00f2fe; padding: 20px; border-radius: 20px; width: 90%; margin: 20px 0; color: #00f2fe; font-size: 22px; font-weight: bold; font-family: 'Roboto Mono', monospace; box-shadow: 0 0 25px rgba(0,242,254,0.3); }
         
-        .loader { border: 4px solid rgba(0, 242, 254, 0.2); border-top: 4px solid #00f2fe; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 30px 0; }
+        /* 🟢 Online Players & History Sections */
+        .section-box { width: 90%; background: rgba(22, 27, 34, 0.6); border: 1px solid #30363d; border-radius: 15px; padding: 12px; margin-top: 15px; text-align: left; }
+        .section-title { font-size: 12px; font-family: 'Orbitron'; color: #00f2fe; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .online-players-list { display: flex; flex-direction: column; gap: 6px; max-height: 110px; overflow-y: auto; }
+        .player-row { display: flex; align-items: center; justify-content: space-between; background: rgba(13, 17, 23, 0.8); padding: 6px 10px; border-radius: 10px; border: 1px solid #21262d; }
+        .player-row-left { display: flex; align-items: center; gap: 8px; }
+        .mini-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #00f2fe; }
+        .player-name { font-size: 12px; font-weight: 600; color: #c9d1d9; }
+        .challenge-btn { background: #2ea043; color: #fff; border: none; padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+
+        .history-list { display: flex; flex-direction: column; gap: 5px; max-height: 120px; overflow-y: auto; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; background: rgba(13, 17, 23, 0.7); padding: 6px 10px; border-radius: 8px; font-size: 11px; }
+        .history-win { color: #2ea043; font-weight: bold; }
+        .history-loss { color: #ff4757; font-weight: bold; }
+
+        .loader { border: 4px solid rgba(0, 242, 254, 0.2); border-top: 4px solid #00f2fe; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px 0; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        .board-wrapper { padding: 8px; background: linear-gradient(135deg, #8B5A2B, #5c3a21); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 0 10px rgba(0,0,0,0.8); margin-top: 8px; border: 2px solid #3e2723;}
+        .board-wrapper { padding: 8px; background: linear-gradient(135deg, #8B5A2B, #5c3a21); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.9); margin-top: 5px; border: 2px solid #3e2723;}
         canvas { border-radius: 8px; cursor: pointer; display: block; background: #3e2723; }
         .rotate-board { transform: rotate(180deg); }
         
-        .timer-container { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 320px; margin-bottom: 10px; background: rgba(22, 27, 34, 0.8); padding: 8px 16px; border-radius: 12px; border: 1px solid #30363d; box-shadow: 0 5px 15px rgba(0,0,0,0.5);}
+        .timer-container { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 320px; margin-bottom: 8px; background: rgba(22, 27, 34, 0.8); padding: 6px 14px; border-radius: 12px; border: 1px solid #30363d; }
         .timer-info { text-align: left; }
-        .timer-status { color:#00f2fe; font-weight:bold; font-family:'Orbitron'; font-size: 14px; margin-bottom: 2px;}
-        .timer-player { color:#c9d1d9; font-size: 12px; font-weight: 600;}
-        .timer-circle { width: 40px; height: 40px; border-radius: 50%; border: 3px solid #00f2fe; display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: 'Roboto Mono', monospace; font-size: 16px; color: #00f2fe; text-shadow: 0 0 5px #00f2fe; box-shadow: 0 0 10px rgba(0,242,254,0.3); }
-        .timer-danger { border-color: #ff4757 !important; color: #ff4757 !important; text-shadow: 0 0 5px #ff4757; box-shadow: 0 0 15px rgba(255,71,87,0.6); animation: pulse 0.5s infinite alternate; }
-        @keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.15); } }
+        .timer-status { color:#00f2fe; font-weight:bold; font-family:'Orbitron'; font-size: 13px; margin-bottom: 2px;}
+        .timer-player { color:#c9d1d9; font-size: 11px; font-weight: 600;}
+        .timer-circle { width: 36px; height: 36px; border-radius: 50%; border: 3px solid #00f2fe; display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: 'Roboto Mono', monospace; font-size: 15px; color: #00f2fe; }
+        .timer-danger { border-color: #ff4757 !important; color: #ff4757 !important; animation: pulse 0.5s infinite alternate; }
+        @keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.12); } }
         
-        .warning-banner { width: 100%; max-width: 320px; background: rgba(255, 71, 87, 0.15); border: 1px solid #ff4757; color: #ff4757; padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 8px; display: none; text-align: center; box-shadow: 0 0 10px rgba(255,71,87,0.2); }
-        .match-warning-notice { width: 100%; max-width: 320px; background: rgba(255, 193, 7, 0.15); border: 1px solid #ffc107; color: #ffc107; padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 8px; text-align: center; }
+        .warning-banner { width: 100%; max-width: 320px; background: rgba(255, 71, 87, 0.15); border: 1px solid #ff4757; color: #ff4757; padding: 5px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 6px; display: none; text-align: center; }
+        .match-warning-notice { width: 100%; max-width: 320px; background: rgba(255, 193, 7, 0.15); border: 1px solid #ffc107; color: #ffc107; padding: 5px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 6px; text-align: center; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 14, 20, 0.95); z-index: 100; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
-        .modal-content { background: #161b22; border: 1px solid #00f2fe; padding: 25px; border-radius: 20px; width: 95%; max-width: 360px; text-align: center; box-shadow: 0 10px 40px rgba(0,242,254,0.2); }
-        .rules-list li { margin-bottom: 8px; text-align: left; }
+        .modal-content { background: #161b22; border: 1px solid #00f2fe; padding: 20px; border-radius: 20px; width: 95%; max-width: 360px; text-align: center; box-shadow: 0 10px 40px rgba(0,242,254,0.2); }
+        .rules-list li { margin-bottom: 6px; text-align: left; font-size: 12px; }
     </style>
 </head>
 <body>
 
     <div class="top-bar">
-        <div style="display:flex; align-items:center; gap:12px;">
-            <img src="https://via.placeholder.com/42/00f2fe/000000?text=X" class="avatar">
+        <div class="user-info-box">
+            <img src="https://via.placeholder.com/38/00f2fe/000000?text=X" class="avatar" id="userAvatar">
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                <span id="userName" style="font-weight: 600; font-size: 15px;">Player</span>
+                <span id="userName" style="font-weight: 600; font-size: 14px;">Player</span>
                 <div class="online-indicator">
-                    <div class="blink-dot"></div> 👤 <span id="onlineCount">1</span> Online
+                    <div class="blink-dot"></div> <span id="onlineCount">1</span> Online
                 </div>
             </div>
         </div>
-        <div class="balance-pill">💰 <span id="userBalance">0</span></div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
+            <div class="balance-pill">💰 <span id="userBalance">0</span></div>
+            <div class="winrate-badge" id="winRateBadge">🏆 Win: 0%</div>
+        </div>
     </div>
 
     <!-- Home Screen -->
     <div id="homeScreen" class="screen active-screen">
         <h1>CheckerX Pro</h1>
-        <p style="color: #8b949e; margin-bottom: 20px; font-size: 14px;">1vs1 Real-time Brazilian Checkers</p>
+        <p style="color: #8b949e; margin-bottom: 15px; font-size: 13px;">1vs1 Real-time Brazilian Checkers</p>
+        
         <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 FIND MATCH</button>
         <button class="btn-primary" style="background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000;" onclick="createPrivateRoom()">👥 CREATE ROOM</button>
         <button class="btn-secondary" onclick="document.getElementById('rulesModal').style.display='flex'">📜 GAME RULES</button>
+
+        <!-- 🟢 Live Online Players Section -->
+        <div class="section-box">
+            <div class="section-title"><span>🟢 Active Players Online</span> <span id="activeOnlineCount">0</span></div>
+            <div class="online-players-list" id="onlinePlayersList">
+                <div style="font-size: 11px; color: #8b949e; text-align: center; padding: 8px;">Scanning active players...</div>
+            </div>
+        </div>
+
+        <!-- 🟢 Last 20 Playing History Section -->
+        <div class="section-box" style="margin-bottom: 15px;">
+            <div class="section-title"><span>⚔️ Last Battle History (20)</span></div>
+            <div class="history-list" id="historyList">
+                <div style="font-size: 11px; color: #8b949e; text-align: center; padding: 8px;">No recent battles recorded yet.</div>
+            </div>
+        </div>
     </div>
 
     <!-- Stake Screen -->
     <div id="stakeScreen" class="screen">
         <h2 style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom: 0;">MATCH STAKE</h2>
-        <div class="stake-box">💰 100 X Coins<br><span style="font-size: 14px; font-weight: normal; color: #8b949e; font-family: 'Poppins', sans-serif;">($1.00)</span></div>
+        <div class="stake-box">💰 100 X Coins<br><span style="font-size: 13px; font-weight: normal; color: #8b949e; font-family: 'Poppins', sans-serif;">($1.00)</span></div>
         <button class="btn-primary" onclick="startMatchmaking()">START SEARCH</button>
         <button class="btn-secondary" onclick="navTo('homeScreen')">BACK</button>
     </div>
@@ -91,7 +129,7 @@
         <h2 style="font-family: 'Orbitron'; color: #00f2fe;" id="waitingTitle">Scanning Arena...</h2>
         <div class="loader"></div>
         <p style="color: #c9d1d9;" id="waitingDesc">Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins</b></p>
-        <button class="btn-secondary" style="border-color:#ff4757; color:#ff4757; margin-top:30px;" onclick="cancelMatchmaking()">CANCEL</button>
+        <button class="btn-secondary" style="border-color:#ff4757; color:#ff4757; margin-top:25px;" onclick="cancelMatchmaking()">CANCEL</button>
     </div>
 
     <!-- Game Screen -->
@@ -114,8 +152,8 @@
     <!-- End Modal -->
     <div id="gameEndModal" class="modal">
         <div class="modal-content">
-            <h1 id="endResultTitle" style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom:10px; font-size: 26px;">VICTORY!</h1>
-            <p id="endResultDesc" style="color: #c9d1d9; font-size: 14px; margin-bottom: 25px; font-family: 'Roboto Mono', monospace;">You won 180 X Coins</p>
+            <h1 id="endResultTitle" style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom:8px; font-size: 24px;">VICTORY!</h1>
+            <p id="endResultDesc" style="color: #c9d1d9; font-size: 13px; margin-bottom: 20px; font-family: 'Roboto Mono', monospace;">You won 180 X Coins</p>
             <button class="btn-primary" onclick="navTo('homeScreen'); document.getElementById('gameEndModal').style.display='none';">MAIN MENU</button>
         </div>
     </div>
@@ -124,12 +162,11 @@
     <div id="rulesModal" class="modal">
         <div class="modal-content">
             <h3 style="color: #00f2fe; font-family: 'Orbitron'; margin-top:0;">📜 PRO RULES</h3>
-            <ul class="rules-list" style="font-size: 13px; color: #c9d1d9; line-height: 1.5; padding-left: 15px;">
-                <li><b>Majority Capture:</b> You must choose the path that captures the maximum number of pieces.</li>
-                <li><b>King Movement 👑:</b> Kings can fly across multiple squares, but must land safely immediately behind a captured piece.</li>
-                <li><b>Time Out Loss:</b> 30 seconds per turn. Missing 2 turns in a row results in match forfeiture.</li>
-                <li><b>Disconnect Loss:</b> Closing the tab or losing connection results in an automatic loss.</li>
-                <li><b>Economy & Fees:</b> Winner receives 180 X Coins (80% profit, 20 coins platform fee).</li>
+            <ul class="rules-list" style="color: #c9d1d9; line-height: 1.4; padding-left: 15px;">
+                <li><b>Majority Capture:</b> Maximum capture path is mandatory.</li>
+                <li><b>King Movement 👑:</b> Flying kings across multiple squares.</li>
+                <li><b>Time Out Loss:</b> 30s per turn. 2 misses = Defeat.</li>
+                <li><b>Economy:</b> Winner gets 180 X Coins (20% network fee).</li>
             </ul>
             <button class="btn-primary" onclick="document.getElementById('rulesModal').style.display='none'">GOT IT</button>
         </div>
@@ -163,17 +200,14 @@
 
         socket.emit('init_user', tgUser);
 
-        // 🟢 Check if opened via Room Invite Link (Query param ?room=room_xxx or WebApp startapp)
+        // 🟢 Room link handler
         const urlParams = new URLSearchParams(window.location.search);
         let startParam = urlParams.get('room');
         if (!startParam) {
             let tgStartParam = tg?.initDataUnsafe?.start_param;
-            if (tgStartParam && tgStartParam.startsWith('room_')) {
-                startParam = tgStartParam;
-            }
+            if (tgStartParam && tgStartParam.startsWith('room_')) startParam = tgStartParam;
         }
 
-        // If user came with a room code, automatically join room
         setTimeout(() => {
             if (startParam && startParam.startsWith('room_')) {
                 navTo('waitingScreen');
@@ -196,19 +230,76 @@
             const inviteLink = `https://t.me/${botUsername}?start=${data.roomId}`;
             
             document.getElementById('waitingTitle').innerText = "Waiting for Friend...";
-            document.getElementById('waitingDesc').innerHTML = `Share this link with your friend:<br><a href="https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('🎮 Play 1vs1 Brazilian Checkers with me on CheckerX!')}" target="_blank" style="color: #00f2fe; word-break: break-all; font-family: 'Roboto Mono'; font-size: 12px; display:inline-block; margin-top:10px;">${inviteLink}</a><br><br><i>Match starts when your friend joins!</i>`;
+            document.getElementById('waitingDesc').innerHTML = `<b>🔗 Click here to share your link:</b><br><a href="https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('🎮 Play 1vs1 Brazilian Checkers with me on CheckerX!')}" target="_blank" style="color: #00f2fe; word-break: break-all; font-family: 'Roboto Mono'; font-size: 11px; display:inline-block; margin-top:8px;">${inviteLink}</a><br><br><i>Match starts when your friend joins!</i>`;
         });
 
-        socket.on('online_count', (count) => {
-            const countEl = document.getElementById('onlineCount');
-            if (countEl) countEl.innerText = count;
+        // 🟢 Online Players & Stats Update
+        socket.on('online_users_list', (users) => {
+            const listEl = document.getElementById('onlinePlayersList');
+            const countEl = document.getElementById('activeOnlineCount');
+            countEl.innerText = users.length;
+
+            if (users.length <= 1) {
+                listEl.innerHTML = `<div style="font-size: 11px; color: #8b949e; text-align: center; padding: 6px;">No other active players online right now.</div>`;
+                return;
+            }
+
+            listEl.innerHTML = '';
+            users.forEach(u => {
+                if (String(u.id) === String(tgUser.id)) return; // Don't show self
+                const row = document.createElement('div');
+                row.className = 'player-row';
+                row.innerHTML = `
+                    <div class="player-row-left">
+                        <img src="https://via.placeholder.com/28/00f2fe/000000?text=X" class="mini-avatar">
+                        <span class="player-name">${u.name}</span>
+                    </div>
+                    <button class="challenge-btn" onclick="challengePlayer('${u.id}')">⚔️ Play</button>
+                `;
+                listEl.appendChild(row);
+            });
         });
 
         socket.on('user_synced', (data) => {
             userBalance = data.balance;
             document.getElementById('userBalance').innerText = userBalance.toLocaleString();
             document.getElementById('userName').innerText = data.name;
+            if (data.winRate !== undefined) {
+                document.getElementById('winRateBadge').innerText = `🏆 Win: ${data.winRate}%`;
+            }
+            if (data.history) {
+                renderHistory(data.history);
+            }
         });
+
+        function renderHistory(history) {
+            const hList = document.getElementById('historyList');
+            if (!history || history.length === 0) {
+                hList.innerHTML = `<div style="font-size: 11px; color: #8b949e; text-align: center; padding: 6px;">No recent battles recorded yet.</div>`;
+                return;
+            }
+            hList.innerHTML = '';
+            history.forEach(h => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                const isWin = h.result === 'WIN';
+                item.innerHTML = `
+                    <span>⚔️ vs ${h.opponent}</span>
+                    <span class="${isWin ? 'history-win' : 'history-loss'}">${isWin ? '👑 WIN (+180)' : '❌ LOSS (-100)'}</span>
+                `;
+                hList.appendChild(item);
+            });
+        }
+
+        function challengePlayer(targetId) {
+            alert("Direct challenge feature is syncing with match rooms!");
+        }
+
+        socket.on('online_count', (count) => {
+            const countEl = document.getElementById('onlineCount');
+            if (countEl) countEl.innerText = count;
+        });
+
         socket.on('error_message', (msg) => alert(msg));
 
         function navTo(id) {
@@ -270,9 +361,13 @@
             renderBoard();
         });
 
-        socket.on('opponent_disconnected', () => showEndGame(true, "Opponent Disconnected! +180 Coins 🎉"));
-        socket.on('opponent_timed_out', () => showEndGame(true, "Opponent Missed Turns! +180 Coins 🎉"));
-        socket.on('you_lost_game', () => showEndGame(false, "Defeat! All your pieces were captured or time expired. ❌"));
+        socket.on('opponent_disconnected', () => showEndGame(true, "Opponent Disconnected! +180 Coins 🎉", "Opponent Left"));
+        socket.on('opponent_timed_out', () => showEndGame(true, "Opponent Missed Turns! +180 Coins 🎉", "Opponent Timeout"));
+        
+        // 🟢 Dynamic Loss Reason Handlers
+        socket.on('you_lost_pieces', () => showEndGame(false, "Defeat! All your pieces were captured ❌", "Pieces Captured"));
+        socket.on('you_lost_timeout', () => showEndGame(false, "Defeat! You exceeded the time limit (Timeout) ⏳", "Timeout Exceeded"));
+        socket.on('you_lost_game', () => showEndGame(false, "Defeat! Match forfeited ❌", "Match Defeat"));
 
         function startTurnTimer() {
             clearInterval(timerInterval);
@@ -312,7 +407,7 @@
                 
                 if (timeOutCount >= 2) {
                     socket.emit('timeout_loss');
-                    showEndGame(false, "Match Lost! Missed 2 turns in a row. ❌");
+                    showEndGame(false, "Defeat! You exceeded the time limit (Timeout) ⏳", "Timeout Exceeded");
                 } else {
                     banner.innerText = "⚠️ WARNING: You missed your turn! One more miss = Defeat.";
                     banner.style.display = "block";
@@ -328,10 +423,10 @@
         function checkWinCondition() {
             let enemyPieces = 0;
             for(let r=0; r<8; r++) for(let c=0; c<8; c++) if(boardState[r][c] && boardState[r][c].color !== myRole) enemyPieces++;
-            if (enemyPieces === 0) { socket.emit('game_won'); showEndGame(true, "Flawless Victory! +180 Coins 🎉"); }
+            if (enemyPieces === 0) { socket.emit('game_won'); showEndGame(true, "Flawless Victory! +180 Coins 🎉", "Pieces Captured"); }
         }
 
-        function showEndGame(isWin, desc) {
+        function showEndGame(isWin, desc, reason) {
             clearInterval(timerInterval);
             const title = document.getElementById('endResultTitle');
             title.innerText = isWin ? "VICTORY!" : "DEFEAT";
