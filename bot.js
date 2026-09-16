@@ -59,17 +59,25 @@ async function getUser(id, name) {
 
 const userStates = {}; 
 
-// --- REGISTRATION FLOW ---
+// --- REGISTRATION & ROOM JOIN FLOW ---
 
 bot.start(async (ctx) => {
     const userId = String(ctx.from.id);
     let user = await User.findOne({ id: userId });
     delete userStates[userId]; 
 
-    // Check if start parameter is a room invite (e.g. /start room_xyz123)
     const payload = ctx.startPayload;
     if (payload && payload.startsWith('room_')) {
-        // Just let user enter, frontend will handle joining the room via socket
+        if (!user || !user.country || !user.language) {
+            return ctx.reply("🌍 *Welcome to CheckerX!*\nPlease complete your quick setup first using /start");
+        }
+        
+        return ctx.replyWithMarkdown(
+            `🎮 *FRIEND INVITE RECEIVED!*\n\nYou have been invited to a private 1vs1 match!\nClick the button below to enter the room and play:`,
+            Markup.inlineKeyboard([
+                [Markup.button.webApp('⚔️ Join Match Now', `https://checkerx-bot.onrender.com/?room=${payload}`)]
+            ])
+        );
     }
 
     if (!user || !user.country) {
@@ -312,7 +320,7 @@ bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.err
 // --- MULTIPLAYER & PRIVATE ROOM ENGINE ---
 // ==========================================
 const waitingPlayers = [];
-const privateRooms = {}; // 🟢 Private room waiting list
+const privateRooms = {}; 
 const activeRooms = {};
 let onlineUsersCount = 0; 
 
@@ -330,7 +338,6 @@ io.on('connection', (socket) => {
         } catch (e) { console.error(e); }
     });
 
-    // 🟢 Create Private Room
     socket.on('create_room', async (data) => {
         try {
             const uid = socket.userId || (data && data.userId) || 'guest';
@@ -348,14 +355,13 @@ io.on('connection', (socket) => {
         } catch (e) { console.error(e); }
     });
 
-    // 🟢 Join Private Room via Link
     socket.on('join_room', async (data) => {
         try {
             const uid = socket.userId || (data && data.userId) || 'guest';
             socket.userId = uid;
             const user = await getUser(uid, socket.userName);
 
-            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
+            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance! You need at least 100 X Coins to join this room.');
 
             const roomId = data.roomId;
             const creatorSocket = privateRooms[roomId];
@@ -364,9 +370,8 @@ io.on('connection', (socket) => {
                 return socket.emit('error_message', 'Room expired or creator left!');
             }
 
-            if (creatorSocket.id === socket.id) return; // Same user
+            if (creatorSocket.id === socket.id) return; 
 
-            // Match found between Creator (p1) and Joiner (p2)
             socket.join(roomId);
             socket.roomId = roomId;
             delete privateRooms[roomId];
@@ -474,7 +479,6 @@ io.on('connection', (socket) => {
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) waitingPlayers.splice(index, 1);
         
-        // Remove from private rooms if exists
         for (const [rid, s] of Object.entries(privateRooms)) {
             if (s.id === socket.id) delete privateRooms[rid];
         }

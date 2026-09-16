@@ -163,16 +163,13 @@
 
         socket.emit('init_user', tgUser);
 
-        // 🟢 Check if opened via Room Invite Link (e.g. startapp=room_xxx)
+        // 🟢 Check if opened via Room Invite Link (Query param ?room=room_xxx or WebApp startapp)
         const urlParams = new URLSearchParams(window.location.search);
-        // Telegram WebApp passes startapp parameter via initData or URL search
-        let startParam = tg?.initDataUnsafe?.start_param;
+        let startParam = urlParams.get('room');
         if (!startParam) {
-            // Check url hash or query
-            const hash = window.location.search;
-            if (hash.includes('room_')) {
-                const match = hash.match(/(room_[a-zA-Z0-9]+)/);
-                if (match) startParam = match[1];
+            let tgStartParam = tg?.initDataUnsafe?.start_param;
+            if (tgStartParam && tgStartParam.startsWith('room_')) {
+                startParam = tgStartParam;
             }
         }
 
@@ -195,7 +192,7 @@
         }
 
         socket.on('room_created', (data) => {
-            const botUsername = 'CheckerX_Official_Bot'; // ඔයාගේ බොට්ගේ යූසර්නෙම් එක
+            const botUsername = 'CheckerX_Official_Bot';
             const inviteLink = `https://t.me/${botUsername}?start=${data.roomId}`;
             
             document.getElementById('waitingTitle').innerText = "Waiting for Friend...";
