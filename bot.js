@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema({
     language: { type: String, default: null },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
-    history: { type: Array, default: [] }, // Last 20 matches history
+    history: { type: Array, default: [] },
     registeredAt: { type: Date, default: Date.now }
 });
 
@@ -261,7 +261,7 @@ bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.err
 const waitingPlayers = [];
 const privateRooms = {}; 
 const activeRooms = {};
-const activeSockets = {}; // Track all connected online users
+const activeSockets = {}; 
 let onlineUsersCount = 0; 
 
 function broadcastOnlineUsers() {
@@ -367,41 +367,39 @@ io.on('connection', (socket) => {
         }
     });
 
-    async function handleWin(winnerSocket, loserSocket, lossReasonType, reasonStr) {
+    // 🟢 RESTORED ORIGINAL STABLE handleWin (Fixes 0 timer hang & restores exact event names)
+    async function handleWin(winnerSocket, loserSocket, eventName, reason = "Normal Win") {
         if (!winnerSocket || !winnerSocket.userId) return;
         try {
             const winner = await User.findOne({ id: winnerSocket.userId });
-            const loser = loserSocket && loserSocket.userId ? await User.findOne({ id: loserSocket.userId }) : null;
-
             if (winner) {
                 winner.balance += 180;
                 winner.wins += 1;
-                winner.history.unshift({ result: 'WIN', opponent: loser ? loser.name : 'Opponent', time: Date.now() });
+                winner.history.unshift({ result: 'WIN', opponent: loserSocket && loserSocket.userName ? loserSocket.userName : 'Opponent', time: Date.now() });
                 if (winner.history.length > 20) winner.history.pop();
                 await winner.save();
-                const wr = Math.round((winner.wins / (winner.wins + winner.losses)) * 100);
+                const wr = Math.round((winner.wins / (winner.wins + winner.losses || 1)) * 100);
                 winnerSocket.emit('user_synced', { balance: winner.balance, name: winner.name, winRate: wr, history: winner.history });
             }
 
-            if (loser) {
-                loser.losses += 1;
-                loser.history.unshift({ result: 'LOSS', opponent: winner ? winner.name : 'Opponent', time: Date.now() });
-                if (loser.history.length > 20) loser.history.pop();
-                await loser.save();
-                const wr = Math.round((loser.wins / (loser.wins + loser.losses)) * 100);
-                
-                if (lossReasonType === 'timeout') {
-                    loserSocket.emit('you_lost_timeout');
-                } else if (lossReasonType === 'pieces') {
-                    loserSocket.emit('you_lost_pieces');
-                } else {
-                    loserSocket.emit('you_lost_game');
+            if (loserSocket && eventName) {
+                loserSocket.emit(eventName);
+                if (loserSocket.userId) {
+                    const loser = await User.findOne({ id: loserSocket.userId });
+                    if (loser) {
+                        loser.losses += 1;
+                        loser.history.unshift({ result: 'LOSS', opponent: winner ? winner.name : 'Opponent', time: Date.now() });
+                        if (loser.history.length > 20) loser.history.pop();
+                        await loser.save();
+                        const wr = Math.round((loser.wins / (loser.wins + loser.losses || 1)) * 100);
+                        loserSocket.emit('user_synced', { balance: loser.balance, name: loser.name, winRate: wr, history: loser.history });
+                    }
                 }
-                loserSocket.emit('user_synced', { balance: loser.balance, name: loser.name, winRate: wr, history: loser.history });
             }
 
-            if (winner && loser) {
-                const logMsg = `🏆 *Match Finished*\n\n🟢 *Winner:* ${winner.name} (\`${winner.id}\`)\n🔴 *Loser:* ${loser.name} (\`${loser.id}\`)\nℹ️ *Reason:* ${reasonStr}`;
+            if (loserSocket && loserSocket.userId && winner) {
+                const loserUser = await User.findOne({ id: loserSocket.userId });
+                const logMsg = `🏆 *Match Finished*\n\n🟢 *Winner:* ${winner.name} (\`${winner.id}\`)\n🔴 *Loser:* ${loserUser ? loserUser.name : 'Player'} (\`${loserSocket.userId}\`)\nℹ️ *Reason:* ${reason}`;
                 bot.telegram.sendMessage(MATCH_LOG_CHANNEL_ID, logMsg, { parse_mode: 'Markdown' }).catch(e => {});
             }
         } catch (e) { console.error("Win handling error:", e); }
@@ -411,7 +409,8 @@ io.on('connection', (socket) => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const loserSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
-            await handleWin(socket, loserSocket, 'pieces', "All Pieces Captured");
+            await handleWin(socket, loserSocket, null, "All Pieces Captured");
+            loserSocket.emit('you_lost_game');
             delete activeRooms[socket.roomId];
         }
     });
@@ -420,7 +419,9 @@ io.on('connection', (socket) => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
-            await handleWin(winnerSocket, socket, 'timeout', "Turn Timeout Limit Exceeded");
+            await handleWin(winnerSocket, socket, 'opponent_timed_out', "Turn Timeout Limit Exceeded");
+            winnerSocket.emit('opponent_timed_out');
+            socket.emit('you_lost_game');
             delete activeRooms[socket.roomId];
         }
     });
@@ -449,7 +450,8 @@ io.on('connection', (socket) => {
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];
             const winnerSocket = (room.p1.id === socket.id) ? room.p2 : room.p1;
-            await handleWin(winnerSocket, socket, 'pieces', "Opponent Disconnected / Left Match");
+            await handleWin(winnerSocket, socket, 'opponent_disconnected', "Opponent Disconnected / Left Match");
+            winnerSocket.emit('opponent_disconnected');
             delete activeRooms[socket.roomId];
         }
     });
