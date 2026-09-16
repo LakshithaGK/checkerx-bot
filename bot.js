@@ -57,7 +57,7 @@ async function getUser(id, name) {
     }
 }
 
-// 🟢 අලුතෙන් එකතු කළ State Object එක (Step-by-step වැඩ කරන්න)
+// 🟢 Step-by-step වැඩ කරන්න හදපු State Object එක
 const userStates = {}; 
 
 // --- BOT COMMANDS ---
@@ -65,13 +65,16 @@ const userStates = {};
 bot.start(async (ctx) => {
     const userId = String(ctx.from.id);
     let user = await User.findOne({ id: userId });
-    delete userStates[userId]; // Reset any ongoing steps
+    delete userStates[userId]; 
 
     if (!user) {
-        return ctx.reply("🌍 **Welcome to CheckerX!**\nPlease select your country to continue:", Markup.inlineKeyboard([
-            [Markup.button.callback('🇧🇷 Brazil', 'country_br'), Markup.button.callback('🇱🇰 Sri Lanka', 'country_lk')],
-            [Markup.button.callback('🇺🇸 USA', 'country_us'), Markup.button.callback('🌍 Other', 'country_other')]
-        ]));
+        return ctx.reply("🌍 *Welcome to CheckerX!*\nPlease select your country to continue:", {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🇧🇷 Brazil', 'country_br'), Markup.button.callback('🇱🇰 Sri Lanka', 'country_lk')],
+                [Markup.button.callback('🇺🇸 USA', 'country_us'), Markup.button.callback('🌍 Other', 'country_other')]
+            ])
+        });
     } else if (!user.language) {
         return sendLanguageSelection(ctx);
     } else {
@@ -97,9 +100,12 @@ bot.action(/country_(.+)/, async (ctx) => {
 });
 
 function sendLanguageSelection(ctx) {
-    ctx.reply("🗣 **Select your Language / Selecione seu idioma:**", Markup.inlineKeyboard([
-        [Markup.button.callback('🇬🇧 English', 'lang_en'), Markup.button.callback('🇵🇹 Português', 'lang_pt')]
-    ]));
+    ctx.reply("🗣 *Select your Language / Selecione seu idioma:*", {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+            [Markup.button.callback('🇬🇧 English', 'lang_en'), Markup.button.callback('🇵🇹 Português', 'lang_pt')]
+        ])
+    });
 }
 
 bot.action(/lang_(.+)/, async (ctx) => {
@@ -113,7 +119,7 @@ bot.action(/lang_(.+)/, async (ctx) => {
 
     try {
         const totalUsers = await User.countDocuments();
-        const adminMsg = `🚨 **New Player Joined!** 🚨\n\n👤 **Name:** ${user.name}\n🆔 **ID:** \`${user.id}\`\n🌍 **Country:** ${user.country.toUpperCase()}\n🗣 **Language:** ${user.language.toUpperCase()}\n\n📊 **Total Players:** ${totalUsers} 📈`;
+        const adminMsg = `🚨 *New Player Joined!* 🚨\n\n👤 *Name:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n🌍 *Country:* ${user.country.toUpperCase()}\n🗣 *Language:* ${user.language.toUpperCase()}\n\n📊 *Total Players:* ${totalUsers} 📈`;
         await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
     } catch (error) { console.log("Admin group error", error.message); }
 
@@ -126,22 +132,20 @@ bot.action(/lang_(.+)/, async (ctx) => {
 });
 
 function sendMainMenu(ctx, user) {
-    const msg = user.language === 'pt' ? `🎮 **Menu Principal**\n💰 Saldo: ${user.balance} X Coins` : `🎮 **Main Menu**\n💰 Balance: ${user.balance} X Coins`;
+    const msg = user.language === 'pt' ? `🎮 *Menu Principal*\n💰 Saldo: ${user.balance} X Coins` : `🎮 *Main Menu*\n💰 Balance: ${user.balance} X Coins`;
     const mainMenu = Markup.keyboard([
         ['🎮 Play CheckerX', '💰 Balance'],
         ['📥 Deposit', '📤 Withdrawal'],
         ['🔗 Referral', '💬 Support']
     ]).resize();
-    ctx.reply(msg, mainMenu);
+    ctx.reply(msg, { parse_mode: 'Markdown', ...mainMenu });
 }
 
-bot.hears('🎮 Play CheckerX', (ctx) => ctx.reply('👇 Click the **Play CheckerX** button at bottom left to play!'));
+bot.hears('🎮 Play CheckerX', (ctx) => ctx.replyWithMarkdown('👇 Click the *Play CheckerX* button at bottom left to play!'));
 
-// 🟢 ලස්සන කරපු Referral Link එක
+// 🟢 ෆික්ස් කරපු Referral Link එක
 bot.hears('🔗 Referral', (ctx) => {
-    // 🔴 'CheckerX_Bot' වෙනුවට ඔයාගේ ඇත්ත Bot Username එක දාන්න (උදා: @mage_checker_bot නම් mage_checker_bot දාන්න)
-    const botUsername = 'CheckerX_Bot'; 
-    
+    const botUsername = 'CheckerX_Official_Bot'; // හරියටම ඔයාගේ බොට්ගේ නම දැම්මා
     ctx.replyWithMarkdown(`🔗 *YOUR REFERRAL LINK*\nShare this link with your friends to invite them to the Arena!\n\n👉 \`https://t.me/${botUsername}?start=${ctx.from.id}\``);
 });
 
@@ -173,11 +177,10 @@ bot.action(/dep_(.+)/, async (ctx) => {
     let address = 'Your_Wallet_Address_Here';
     if(method === 'BINANCE') address = 'Pay ID: 123456789'; 
 
-    // මතක තියාගන්නවා යූසර් ඉන්නේ Deposit Amount අහන Step එකේ කියලා
     userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount' };
 
     await ctx.answerCbQuery();
-    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend your payment to this address:\n\`${address}\`\n\n👇 **How much are you depositing? (in USD)**\n_(Please type the exact dollar amount below. E.g: 5.50)_`);
+    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend your payment to this address:\n\`${address}\`\n\n👇 *How much are you depositing? (in USD)*\n_(Please type the exact dollar amount below. E.g: 5.50)_`);
 });
 
 
@@ -189,11 +192,11 @@ bot.hears('📤 Withdrawal', async (ctx) => {
     const user = await User.findOne({ id: String(userId) });
 
     if (user.balance < 300) {
-        return ctx.replyWithMarkdown(`❌ **Insufficient Balance**\nYour balance is \`${user.balance} X Coins\`.\n_Minimum withdrawal is 300 X Coins ($3.00)._`);
+        return ctx.replyWithMarkdown(`❌ *Insufficient Balance*\nYour balance is \`${user.balance} X Coins\`.\n_Minimum withdrawal is 300 X Coins ($3.00)._`);
     }
 
     userStates[userId] = { action: 'withdraw', step: 'awaiting_amount' };
-    ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 **How many X Coins do you want to withdraw?**\n_(Please type the amount below. E.g: 350)_");
+    ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw?*\n_(Please type the amount below. E.g: 350)_");
 });
 
 bot.action(/with_(.+)/, async (ctx) => {
@@ -206,12 +209,15 @@ bot.action(/with_(.+)/, async (ctx) => {
     state.step = 'awaiting_address';
     
     await ctx.answerCbQuery();
-    ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n📍 **Please paste your Wallet Address / Pay ID below:**`);
+    ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n📍 *Please paste your Wallet Address / Pay ID below:*`);
 });
 
-bot.hears('💬 Support', (ctx) => ctx.reply("💬 **Customer Support**\nClick below to chat directly with an Admin.", Markup.inlineKeyboard([
-    [Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')] // 🔴 ඔයාගේ Username එක දාන්න
-])));
+bot.hears('💬 Support', (ctx) => ctx.reply("💬 *Customer Support*\nClick below to chat directly with an Admin.", {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard([
+        [Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')] // 🔴 ඔයාගේ Username එක දාන්න
+    ])
+}));
 
 // Admin Add Coins
 bot.command('addcoins', async (ctx) => {
@@ -236,13 +242,12 @@ bot.on('text', async (ctx, next) => {
     const text = ctx.message.text;
     const state = userStates[userId];
 
-    // යූසර් වෙන Main Menu Button එකක් එබුවොත් Flow එක කැන්සල් වෙනවා
     if (['🎮 Play CheckerX', '💰 Balance', '📥 Deposit', '📤 Withdrawal', '🔗 Referral', '💬 Support'].includes(text)) {
         delete userStates[userId];
         return next(); 
     }
 
-    if (!state) return next(); // කිසිම Step එකක නැත්නම් අතාරිනවා
+    if (!state) return next(); 
 
     // --- DEPOSIT FLOW ---
     if (state.action === 'deposit' && state.step === 'awaiting_amount') {
@@ -251,17 +256,17 @@ bot.on('text', async (ctx, next) => {
         
         state.amount = amount;
         state.step = 'awaiting_txid';
-        return ctx.replyWithMarkdown(`✅ Amount saved: **$${amount}**\n\n🔗 Now, please paste your **Transaction ID (TxID)** below:`);
+        return ctx.replyWithMarkdown(`✅ Amount saved: *$${amount}*\n\n🔗 Now, please paste your *Transaction ID (TxID)* below:`);
     }
 
     if (state.action === 'deposit' && state.step === 'awaiting_txid') {
         const txid = text;
         const user = await User.findOne({ id: String(userId) });
         
-        const adminMsg = `📥 **NEW DEPOSIT ALERT** 📥\n\n👤 **User:** ${user.name}\n🆔 **ID:** \`${user.id}\`\n💸 **Amount:** $${state.amount}\n🏦 **Method:** ${state.method}\n🔗 **TxID:** \`${txid}\``;
+        const adminMsg = `📥 *NEW DEPOSIT ALERT* 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amount:* $${state.amount}\n🏦 *Method:* ${state.method}\n🔗 *TxID:* \`${txid}\``;
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.log(e));
 
-        ctx.reply("✅ **Deposit Request Submitted!**\nAdmins will verify your TxID and credit your X Coins shortly.");
+        ctx.replyWithMarkdown("✅ *Deposit Request Submitted!*\nAdmins will verify your TxID and credit your X Coins shortly.");
         delete userStates[userId];
         return;
     }
@@ -296,10 +301,10 @@ bot.on('text', async (ctx, next) => {
         user.balance -= state.amount;
         await user.save();
 
-        const adminMsg = `📤 **NEW WITHDRAWAL ALERT** 📤\n\n👤 **User:** ${user.name}\n🆔 **ID:** \`${user.id}\`\n💸 **Amount:** ${state.amount} X Coins ($${(state.amount/100).toFixed(2)})\n🏦 **Method:** ${state.method}\n📍 **Address:** \`${address}\``;
+        const adminMsg = `📤 *NEW WITHDRAWAL ALERT* 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amount:* ${state.amount} X Coins ($${(state.amount/100).toFixed(2)})\n🏦 *Method:* ${state.method}\n📍 *Address:* \`${address}\``;
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.log(e));
 
-        ctx.replyWithMarkdown(`✅ **Withdrawal Successful!**\n\`${state.amount} X Coins\` have been automatically deducted from your balance. The funds will be sent to your address shortly.\n\n💰 **New Balance:** ${user.balance} X Coins`);
+        ctx.replyWithMarkdown(`✅ *Withdrawal Successful!*\n\`${state.amount} X Coins\` have been automatically deducted from your balance. The funds will be sent to your address shortly.\n\n💰 *New Balance:* ${user.balance} X Coins`);
         delete userStates[userId];
         return;
     }
