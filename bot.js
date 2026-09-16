@@ -7,9 +7,9 @@ const mongoose = require('mongoose');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const MONGO_URI = process.env.MONGO_URI; 
-const ADMIN_ID = "8739780042"; // 🔴 ඔයාගේ Admin ID එක
-const MATCH_LOG_CHANNEL_ID = "-1004321776706"; // 🔴 Match logs වැටෙන Channel ID එක 
-const ADMIN_GROUP_ID = "-1004321776706"; // 🔴 New Users/Deposits/Withdrawals වැටෙන Group ID එක
+const ADMIN_ID = "8739780042"; 
+const MATCH_LOG_CHANNEL_ID = "-1004321776706"; 
+const ADMIN_GROUP_ID = "-1004321776706"; 
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing!");
@@ -59,14 +59,19 @@ async function getUser(id, name) {
 
 const userStates = {}; 
 
-// --- 🟢 REGISTRATION FLOW ---
+// --- REGISTRATION FLOW ---
 
 bot.start(async (ctx) => {
     const userId = String(ctx.from.id);
     let user = await User.findOne({ id: userId });
     delete userStates[userId]; 
 
-    // 🟢 යූසර් කෙනෙක් හිටියත්, රට සේව් වෙලා නැත්නම් අනිවාර්යයෙන් රට අහනවා
+    // Check if start parameter is a room invite (e.g. /start room_xyz123)
+    const payload = ctx.startPayload;
+    if (payload && payload.startsWith('room_')) {
+        // Just let user enter, frontend will handle joining the room via socket
+    }
+
     if (!user || !user.country) {
         return ctx.reply("🌍 *Welcome to CheckerX!*\nPlease select your country to continue:", {
             parse_mode: 'Markdown',
@@ -88,14 +93,12 @@ bot.action(/country_(.+)/, async (ctx) => {
     const countryParam = ctx.match[1];
     const userId = String(ctx.from.id);
     
-    // යූසර් "Other" තේරුවොත් ටයිප් කරන්න දෙනවා
     if (countryParam === 'other') {
         userStates[userId] = { action: 'register', step: 'awaiting_country_name' };
         await ctx.answerCbQuery();
         return ctx.replyWithMarkdown("🌍 *Please type the name of your country below:*");
     }
 
-    // බටන් එකකින් රටක් තේරුවොත් ඒක සේව් කරනවා
     let user = await User.findOne({ id: userId });
     if (!user) {
         user = new User({ id: userId, name: ctx.from.first_name, country: countryParam });
@@ -126,7 +129,6 @@ bot.action(/lang_(.+)/, async (ctx) => {
     await user.save();
     ctx.deleteMessage();
 
-    // 🟢 Group එකට යන Notification එක (සම්පූර්ණ විස්තර එක්ක)
     try {
         const totalUsers = await User.countDocuments();
         const adminMsg = `🚨 *New Player Joined!* 🚨\n\n👤 *Name:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n🌍 *Country:* ${user.country}\n🗣 *Language:* ${user.language.toUpperCase()}\n\n📊 *Total Players:* ${totalUsers} 📈`;
@@ -151,12 +153,10 @@ function sendMainMenu(ctx, user) {
     ctx.reply(msg, { parse_mode: 'Markdown', ...mainMenu });
 }
 
-// --- BOT MENUS ---
-
 bot.hears('🎮 Play CheckerX', (ctx) => ctx.replyWithMarkdown('👇 Click the *Play CheckerX* button at bottom left to play!'));
 
 bot.hears('🔗 Referral', (ctx) => {
-    const botUsername = 'CheckerX_Official_Bot'; // 🔴 ඔයාගේ බොට්ගේ නම
+    const botUsername = 'CheckerX_Official_Bot';
     ctx.replyWithMarkdown(`🔗 *YOUR REFERRAL LINK*\nShare this link with your friends to invite them to the Arena!\n\n👉 \`https://t.me/${botUsername}?start=${ctx.from.id}\``);
 });
 
@@ -207,7 +207,7 @@ bot.action(/with_(.+)/, async (ctx) => {
 
 bot.hears('💬 Support', (ctx) => ctx.reply("💬 *Customer Support*\nClick below to chat directly with an Admin.", {
     parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard([[Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')]]) // 🔴 ඔයාගේ Username එක
+    ...Markup.inlineKeyboard([[Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')]])
 }));
 
 bot.command('addcoins', async (ctx) => {
@@ -224,15 +224,11 @@ bot.command('addcoins', async (ctx) => {
     } catch (e) { ctx.reply(`❌ Error.`); }
 });
 
-// ==========================================
-// 🟢 TEXT HANDLER (Typing Inputs අල්ලගන්න එක)
-// ==========================================
 bot.on('text', async (ctx, next) => {
     const userId = ctx.from.id;
     const text = ctx.message.text;
     const state = userStates[userId];
 
-    // 🟢 Registration Flow - Typed Country
     if (state && state.action === 'register' && state.step === 'awaiting_country_name') {
         const countryName = text.trim();
         let user = await User.findOne({ id: String(userId) });
@@ -248,7 +244,6 @@ bot.on('text', async (ctx, next) => {
         return sendLanguageSelection(ctx);
     }
 
-    // 🟢 යූසර් රට සහ භාෂාව තෝරලා නැත්නම් Main Menu එක පාවිච්චි කරන්න දෙන්නේ නෑ
     let user = await User.findOne({ id: String(userId) });
     if (user && (!user.country || !user.language)) {
          return ctx.reply("⚠️ Please complete the setup first by using /start");
@@ -314,9 +309,10 @@ bot.on('text', async (ctx, next) => {
 bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.error("Bot Error:", err.message));
 
 // ==========================================
-// --- MULTIPLAYER ENGINE (නොවෙනස්ව තබා ඇත) ---
+// --- MULTIPLAYER & PRIVATE ROOM ENGINE ---
 // ==========================================
 const waitingPlayers = [];
+const privateRooms = {}; // 🟢 Private room waiting list
 const activeRooms = {};
 let onlineUsersCount = 0; 
 
@@ -331,6 +327,61 @@ io.on('connection', (socket) => {
             socket.userId = user.id;
             socket.userName = user.name;
             socket.emit('user_synced', { balance: user.balance, name: user.name });
+        } catch (e) { console.error(e); }
+    });
+
+    // 🟢 Create Private Room
+    socket.on('create_room', async (data) => {
+        try {
+            const uid = socket.userId || (data && data.userId) || 'guest';
+            socket.userId = uid;
+            const user = await getUser(uid, socket.userName);
+
+            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
+
+            const roomId = `room_${Math.random().toString(36.substring(2, 9))}_${Date.now()}`;
+            socket.join(roomId);
+            socket.roomId = roomId;
+            privateRooms[roomId] = socket;
+
+            socket.emit('room_created', { roomId });
+        } catch (e) { console.error(e); }
+    });
+
+    // 🟢 Join Private Room via Link
+    socket.on('join_room', async (data) => {
+        try {
+            const uid = socket.userId || (data && data.userId) || 'guest';
+            socket.userId = uid;
+            const user = await getUser(uid, socket.userName);
+
+            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
+
+            const roomId = data.roomId;
+            const creatorSocket = privateRooms[roomId];
+
+            if (!creatorSocket) {
+                return socket.emit('error_message', 'Room expired or creator left!');
+            }
+
+            if (creatorSocket.id === socket.id) return; // Same user
+
+            // Match found between Creator (p1) and Joiner (p2)
+            socket.join(roomId);
+            socket.roomId = roomId;
+            delete privateRooms[roomId];
+
+            activeRooms[roomId] = { p1: creatorSocket, p2: socket, turn: 'red' };
+
+            const u1 = await User.findOne({ id: creatorSocket.userId });
+            const u2 = await User.findOne({ id: socket.userId });
+
+            if (u1) { u1.balance -= 100; await u1.save(); creatorSocket.emit('user_synced', { balance: u1.balance, name: u1.name }); }
+            if (u2) { u2.balance -= 100; await u2.save(); socket.emit('user_synced', { balance: u2.balance, name: u2.name }); }
+
+            creatorSocket.emit('match_found', { role: 'red', opponentName: socket.userName, roomId });
+            socket.emit('match_found', { role: 'black', opponentName: creatorSocket.userName, roomId });
+
         } catch (e) { console.error(e); }
     });
 
@@ -422,6 +473,11 @@ io.on('connection', (socket) => {
     socket.on('cancel_search', () => {
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) waitingPlayers.splice(index, 1);
+        
+        // Remove from private rooms if exists
+        for (const [rid, s] of Object.entries(privateRooms)) {
+            if (s.id === socket.id) delete privateRooms[rid];
+        }
     });
 
     socket.on('disconnect', async () => {
@@ -430,6 +486,10 @@ io.on('connection', (socket) => {
 
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) waitingPlayers.splice(index, 1);
+
+        for (const [rid, s] of Object.entries(privateRooms)) {
+            if (s.id === socket.id) delete privateRooms[rid];
+        }
 
         if (socket.roomId && activeRooms[socket.roomId]) {
             const room = activeRooms[socket.roomId];

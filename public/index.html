@@ -25,9 +25,9 @@
         
         h1 { font-family: 'Orbitron', sans-serif; color: #00f2fe; font-size: 28px; text-shadow: 0 0 10px rgba(0,242,254,0.4); margin-bottom: 5px;}
         
-        .btn-primary { background: linear-gradient(135deg, #00f2fe, #4facfe); color: #000; border: none; padding: 16px 35px; font-weight: 700; font-family: 'Orbitron', sans-serif; font-size: 16px; border-radius: 30px; cursor: pointer; margin-top: 15px; width: 85%; box-shadow: 0 0 15px rgba(0,242,254,0.4); transition: transform 0.1s; }
+        .btn-primary { background: linear-gradient(135deg, #00f2fe, #4facfe); color: #000; border: none; padding: 15px 30px; font-weight: 700; font-family: 'Orbitron', sans-serif; font-size: 15px; border-radius: 30px; cursor: pointer; margin-top: 12px; width: 85%; box-shadow: 0 0 15px rgba(0,242,254,0.4); transition: transform 0.1s; }
         .btn-primary:active { transform: scale(0.95); }
-        .btn-secondary { background: transparent; color: #00f2fe; border: 2px solid #00f2fe; padding: 14px 24px; font-weight: 600; border-radius: 25px; cursor: pointer; margin-top: 12px; width: 85%; transition: 0.3s; }
+        .btn-secondary { background: transparent; color: #00f2fe; border: 2px solid #00f2fe; padding: 12px 24px; font-weight: 600; border-radius: 25px; cursor: pointer; margin-top: 10px; width: 85%; transition: 0.3s; }
         
         .stake-box { background: rgba(22, 27, 34, 0.8); border: 2px solid #00f2fe; padding: 25px; border-radius: 20px; width: 85%; margin: 25px 0; color: #00f2fe; font-size: 24px; font-weight: bold; font-family: 'Roboto Mono', monospace; box-shadow: 0 0 25px rgba(0,242,254,0.3); }
         
@@ -46,7 +46,6 @@
         .timer-danger { border-color: #ff4757 !important; color: #ff4757 !important; text-shadow: 0 0 5px #ff4757; box-shadow: 0 0 15px rgba(255,71,87,0.6); animation: pulse 0.5s infinite alternate; }
         @keyframes pulse { 0% { transform: scale(1); } 100% { transform: scale(1.15); } }
         
-        /* ⚠️ Non-blocking Notification Banner */
         .warning-banner { width: 100%; max-width: 320px; background: rgba(255, 71, 87, 0.15); border: 1px solid #ff4757; color: #ff4757; padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 8px; display: none; text-align: center; box-shadow: 0 0 10px rgba(255,71,87,0.2); }
         .match-warning-notice { width: 100%; max-width: 320px; background: rgba(255, 193, 7, 0.15); border: 1px solid #ffc107; color: #ffc107; padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 8px; text-align: center; }
 
@@ -73,8 +72,9 @@
     <!-- Home Screen -->
     <div id="homeScreen" class="screen active-screen">
         <h1>CheckerX Pro</h1>
-        <p style="color: #8b949e; margin-bottom: 30px; font-size: 14px;">1vs1 Real-time Brazilian Checkers</p>
-        <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 PLAY NOW</button>
+        <p style="color: #8b949e; margin-bottom: 20px; font-size: 14px;">1vs1 Real-time Brazilian Checkers</p>
+        <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 FIND MATCH</button>
+        <button class="btn-primary" style="background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000;" onclick="createPrivateRoom()">👥 CREATE ROOM</button>
         <button class="btn-secondary" onclick="document.getElementById('rulesModal').style.display='flex'">📜 GAME RULES</button>
     </div>
 
@@ -82,24 +82,21 @@
     <div id="stakeScreen" class="screen">
         <h2 style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom: 0;">MATCH STAKE</h2>
         <div class="stake-box">💰 100 X Coins<br><span style="font-size: 14px; font-weight: normal; color: #8b949e; font-family: 'Poppins', sans-serif;">($1.00)</span></div>
-        <button class="btn-primary" onclick="startMatchmaking()">FIND MATCH</button>
+        <button class="btn-primary" onclick="startMatchmaking()">START SEARCH</button>
         <button class="btn-secondary" onclick="navTo('homeScreen')">BACK</button>
     </div>
 
     <!-- Waiting Screen -->
     <div id="waitingScreen" class="screen">
-        <h2 style="font-family: 'Orbitron'; color: #00f2fe;">Scanning Arena...</h2>
+        <h2 style="font-family: 'Orbitron'; color: #00f2fe;" id="waitingTitle">Scanning Arena...</h2>
         <div class="loader"></div>
-        <p style="color: #c9d1d9;">Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins</b></p>
-        <button class="btn-secondary" style="border-color:#ff4757; color:#ff4757; margin-top:30px;" onclick="cancelMatchmaking()">CANCEL MATCHMAKING</button>
+        <p style="color: #c9d1d9;" id="waitingDesc">Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins</b></p>
+        <button class="btn-secondary" style="border-color:#ff4757; color:#ff4757; margin-top:30px;" onclick="cancelMatchmaking()">CANCEL</button>
     </div>
 
     <!-- Game Screen -->
     <div id="gameScreen" class="screen">
-        <!-- ⚠️ Warning Notice for Tab Closing -->
         <div class="match-warning-notice">⚠️ Do not close or switch tabs, or you will lose!</div>
-        
-        <!-- 🔔 Live Notification Banner for Timeout Warning -->
         <div id="warningBanner" class="warning-banner">⚠️ Warning: You missed your turn! One more miss = Defeat.</div>
 
         <div class="timer-container">
@@ -123,7 +120,7 @@
         </div>
     </div>
 
-    <!-- Rules Modal (English) -->
+    <!-- Rules Modal -->
     <div id="rulesModal" class="modal">
         <div class="modal-content">
             <h3 style="color: #00f2fe; font-family: 'Orbitron'; margin-top:0;">📜 PRO RULES</h3>
@@ -166,6 +163,45 @@
 
         socket.emit('init_user', tgUser);
 
+        // 🟢 Check if opened via Room Invite Link (e.g. startapp=room_xxx)
+        const urlParams = new URLSearchParams(window.location.search);
+        // Telegram WebApp passes startapp parameter via initData or URL search
+        let startParam = tg?.initDataUnsafe?.start_param;
+        if (!startParam) {
+            // Check url hash or query
+            const hash = window.location.search;
+            if (hash.includes('room_')) {
+                const match = hash.match(/(room_[a-zA-Z0-9]+)/);
+                if (match) startParam = match[1];
+            }
+        }
+
+        // If user came with a room code, automatically join room
+        setTimeout(() => {
+            if (startParam && startParam.startsWith('room_')) {
+                navTo('waitingScreen');
+                document.getElementById('waitingTitle').innerText = "Joining Room...";
+                document.getElementById('waitingDesc').innerText = "Connecting with friend...";
+                socket.emit('join_room', { roomId: startParam, userId: tgUser.id });
+            }
+        }, 1000);
+
+        function createPrivateRoom() {
+            if (userBalance < 100) return alert('Insufficient Balance! Please deposit coins to create a room.');
+            navTo('waitingScreen');
+            document.getElementById('waitingTitle').innerText = "Creating Room...";
+            document.getElementById('waitingDesc').innerText = "Generating invite link...";
+            socket.emit('create_room', { userId: tgUser.id });
+        }
+
+        socket.on('room_created', (data) => {
+            const botUsername = 'CheckerX_Official_Bot'; // ඔයාගේ බොට්ගේ යූසර්නෙම් එක
+            const inviteLink = `https://t.me/${botUsername}?start=${data.roomId}`;
+            
+            document.getElementById('waitingTitle').innerText = "Waiting for Friend...";
+            document.getElementById('waitingDesc').innerHTML = `Share this link with your friend:<br><a href="https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('🎮 Play 1vs1 Brazilian Checkers with me on CheckerX!')}" target="_blank" style="color: #00f2fe; word-break: break-all; font-family: 'Roboto Mono'; font-size: 12px; display:inline-block; margin-top:10px;">${inviteLink}</a><br><br><i>Match starts when your friend joins!</i>`;
+        });
+
         socket.on('online_count', (count) => {
             const countEl = document.getElementById('onlineCount');
             if (countEl) countEl.innerText = count;
@@ -186,6 +222,8 @@
         function startMatchmaking() {
             if (userBalance < 100) return alert('Insufficient Balance! Please deposit coins to play.');
             navTo('waitingScreen');
+            document.getElementById('waitingTitle').innerText = "Scanning Arena...";
+            document.getElementById('waitingDesc').innerHTML = `Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins</b>`;
             socket.emit('find_match', { userId: tgUser.id });
         }
 
@@ -201,7 +239,7 @@
             timeOutCount = 0;
             isMultiJumping = false;
             selectedPiece = null;
-            document.getElementById('warningBanner').style.display = 'none'; // Reset warning banner
+            document.getElementById('warningBanner').style.display = 'none';
             navTo('gameScreen');
             setupInitialBoard();
             calculateMandatoryPieces();
@@ -279,7 +317,6 @@
                     socket.emit('timeout_loss');
                     showEndGame(false, "Match Lost! Missed 2 turns in a row. ❌");
                 } else {
-                    // 🔔 Show Non-blocking Notification Banner instead of blocking alert()
                     banner.innerText = "⚠️ WARNING: You missed your turn! One more miss = Defeat.";
                     banner.style.display = "block";
 
