@@ -16,12 +16,13 @@
         .user-info-box { display: flex; align-items: center; gap: 10px; }
         .avatar-container { position: relative; }
         .avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #00f2fe; display: block; }
-        .top-blink-dot { width: 9px; height: 9px; background-color: #2ea043; border-radius: 50%; border: 2px solid #161b22; position: absolute; bottom: 0; right: 0; box-shadow: 0 0 8px #2ea043; animation: blinker 1.5s linear infinite; }
         
         .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-family: 'Roboto Mono', monospace; color: #00f2fe; font-size: 13px; text-shadow: 0 0 5px rgba(0,242,254,0.5); }
         .winrate-badge { background: rgba(241, 196, 15, 0.15); border: 1px solid #f1c40f; color: #f1c40f; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-family: 'Roboto Mono', monospace; font-weight: bold; text-align: center; }
 
+        /* 🟢 Top-left Blink Online Counter */
         .online-indicator { font-size: 11px; color: #8b949e; display: flex; align-items: center; gap: 5px; margin-top: 2px; font-weight: 600; }
+        .blink-dot { width: 7px; height: 7px; background-color: #2ea043; border-radius: 50%; box-shadow: 0 0 8px #2ea043; animation: blinker 1.5s linear infinite; display: inline-block; }
         @keyframes blinker { 50% { opacity: 0.3; } }
 
         .screen { display: none; width: 100%; max-width: 420px; padding: 85px 15px 20px; text-align: center; overflow-y: auto; max-height: 100vh; }
@@ -38,14 +39,7 @@
         .section-box { width: 90%; background: rgba(22, 27, 34, 0.6); border: 1px solid #30363d; border-radius: 15px; padding: 12px; margin-top: 15px; text-align: left; }
         .section-title { font-size: 12px; font-family: 'Orbitron'; color: #00f2fe; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
         
-        .online-players-list { display: flex; flex-direction: column; gap: 6px; max-height: 110px; overflow-y: auto; }
-        .player-row { display: flex; align-items: center; justify-content: space-between; background: rgba(13, 17, 23, 0.8); padding: 6px 10px; border-radius: 10px; border: 1px solid #21262d; }
-        .player-row-left { display: flex; align-items: center; gap: 8px; }
-        .mini-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #00f2fe; }
-        .player-name { font-size: 12px; font-weight: 600; color: #c9d1d9; }
-        .challenge-btn { background: #2ea043; color: #fff; border: none; padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 8px; cursor: pointer; }
-
-        .history-list { display: flex; flex-direction: column; gap: 5px; max-height: 120px; overflow-y: auto; }
+        .history-list { display: flex; flex-direction: column; gap: 5px; max-height: 140px; overflow-y: auto; }
         .history-item { display: flex; justify-content: space-between; align-items: center; background: rgba(13, 17, 23, 0.7); padding: 6px 10px; border-radius: 8px; font-size: 11px; }
         .history-win { color: #2ea043; font-weight: bold; }
         .history-loss { color: #ff4757; font-weight: bold; }
@@ -79,12 +73,11 @@
         <div class="user-info-box">
             <div class="avatar-container">
                 <img src="https://via.placeholder.com/38/00f2fe/000000?text=X" class="avatar" id="userAvatar">
-                <div class="top-blink-dot"></div>
             </div>
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
                 <span id="userName" style="font-weight: 600; font-size: 14px;">Player</span>
                 <div class="online-indicator">
-                    <span id="onlineCount">1</span> Online
+                    <div class="blink-dot"></div> <span id="onlineCount">1</span> Online
                 </div>
             </div>
         </div>
@@ -103,14 +96,9 @@
         <button class="btn-primary" style="background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000;" onclick="createPrivateRoom()">👥 CREATE ROOM</button>
         <button class="btn-secondary" onclick="document.getElementById('rulesModal').style.display='flex'">📜 GAME RULES</button>
 
-        <div class="section-box">
-            <div class="section-title"><span>🟢 Active Players Online</span> <span id="activeOnlineCount">0</span></div>
-            <div class="online-players-list" id="onlinePlayersList">
-                <div style="font-size: 11px; color: #8b949e; text-align: center; padding: 8px;">Scanning active players...</div>
-            </div>
-        </div>
+        <!-- 🟢 Active players list box removed as requested, leaving space for future features -->
 
-        <div class="section-box" style="margin-bottom: 15px;">
+        <div class="section-box" style="margin-top: 15px; margin-bottom: 15px;">
             <div class="section-title"><span>⚔️ Last Battle History (20)</span></div>
             <div class="history-list" id="historyList">
                 <div style="font-size: 11px; color: #8b949e; text-align: center; padding: 8px;">No recent battles recorded yet.</div>
@@ -236,30 +224,9 @@
             document.getElementById('waitingDesc').innerHTML = `<b>🔗 Click here to share your link:</b><br><a href="https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('🎮 Play 1vs1 Checkers with me on CheckerX!')}" target="_blank" style="color: #00f2fe; word-break: break-all; font-family: 'Roboto Mono'; font-size: 11px; display:inline-block; margin-top:8px;">${inviteLink}</a><br><br><i>Match starts when your friend joins!</i>`;
         });
 
-        socket.on('online_users_list', (users) => {
-            const listEl = document.getElementById('onlinePlayersList');
-            const countEl = document.getElementById('activeOnlineCount');
-            countEl.innerText = users.length;
-
-            if (users.length <= 1) {
-                listEl.innerHTML = `<div style="font-size: 11px; color: #8b949e; text-align: center; padding: 6px;">No other active players online right now.</div>`;
-                return;
-            }
-
-            listEl.innerHTML = '';
-            users.forEach(u => {
-                if (String(u.id) === String(tgUser.id)) return;
-                const row = document.createElement('div');
-                row.className = 'player-row';
-                row.innerHTML = `
-                    <div class="player-row-left">
-                        <img src="https://via.placeholder.com/28/00f2fe/000000?text=X" class="mini-avatar">
-                        <span class="player-name">${u.name}</span>
-                    </div>
-                    <button class="challenge-btn" onclick="challengePlayer('${u.id}')">⚔️ Play</button>
-                `;
-                listEl.appendChild(row);
-            });
+        socket.on('online_count', (count) => {
+            const countEl = document.getElementById('onlineCount');
+            if (countEl) countEl.innerText = count;
         });
 
         socket.on('user_synced', (data) => {
@@ -292,15 +259,6 @@
                 hList.appendChild(item);
             });
         }
-
-        function challengePlayer(targetId) {
-            alert("Direct challenge feature is syncing with match rooms!");
-        }
-
-        socket.on('online_count', (count) => {
-            const countEl = document.getElementById('onlineCount');
-            if (countEl) countEl.innerText = count;
-        });
 
         socket.on('error_message', (msg) => alert(msg));
 
