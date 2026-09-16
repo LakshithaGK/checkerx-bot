@@ -57,22 +57,24 @@ async function getUser(id, name) {
     }
 }
 
-// 🟢 Step-by-step වැඩ කරන්න හදපු State Object එක
 const userStates = {}; 
 
-// --- BOT COMMANDS ---
+// --- 🟢 REGISTRATION FLOW ---
 
 bot.start(async (ctx) => {
     const userId = String(ctx.from.id);
     let user = await User.findOne({ id: userId });
     delete userStates[userId]; 
 
-    if (!user) {
+    // 🟢 යූසර් කෙනෙක් හිටියත්, රට සේව් වෙලා නැත්නම් අනිවාර්යයෙන් රට අහනවා
+    if (!user || !user.country) {
         return ctx.reply("🌍 *Welcome to CheckerX!*\nPlease select your country to continue:", {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-                [Markup.button.callback('🇧🇷 Brazil', 'country_br'), Markup.button.callback('🇱🇰 Sri Lanka', 'country_lk')],
-                [Markup.button.callback('🇺🇸 USA', 'country_us'), Markup.button.callback('🌍 Other', 'country_other')]
+                [Markup.button.callback('🇧🇷 Brazil', 'country_Brazil'), Markup.button.callback('🇱🇰 Sri Lanka', 'country_Sri Lanka')],
+                [Markup.button.callback('🇺🇸 USA', 'country_USA'), Markup.button.callback('🇵🇹 Portugal', 'country_Portugal')],
+                [Markup.button.callback('🇷🇺 Russia', 'country_Russia'), Markup.button.callback('🇮🇳 India', 'country_India')],
+                [Markup.button.callback('🌍 Other (Type your country)', 'country_other')]
             ])
         });
     } else if (!user.language) {
@@ -83,17 +85,24 @@ bot.start(async (ctx) => {
 });
 
 bot.action(/country_(.+)/, async (ctx) => {
-    const country = ctx.match[1];
+    const countryParam = ctx.match[1];
     const userId = String(ctx.from.id);
-    let user = await User.findOne({ id: userId });
     
-    if (!user) {
-        user = new User({ id: userId, name: ctx.from.first_name, country: country });
-        await user.save();
-    } else {
-        user.country = country;
-        await user.save();
+    // යූසර් "Other" තේරුවොත් ටයිප් කරන්න දෙනවා
+    if (countryParam === 'other') {
+        userStates[userId] = { action: 'register', step: 'awaiting_country_name' };
+        await ctx.answerCbQuery();
+        return ctx.replyWithMarkdown("🌍 *Please type the name of your country below:*");
     }
+
+    // බටන් එකකින් රටක් තේරුවොත් ඒක සේව් කරනවා
+    let user = await User.findOne({ id: userId });
+    if (!user) {
+        user = new User({ id: userId, name: ctx.from.first_name, country: countryParam });
+    } else {
+        user.country = countryParam;
+    }
+    await user.save();
     
     ctx.deleteMessage();
     sendLanguageSelection(ctx);
@@ -117,9 +126,10 @@ bot.action(/lang_(.+)/, async (ctx) => {
     await user.save();
     ctx.deleteMessage();
 
+    // 🟢 Group එකට යන Notification එක (සම්පූර්ණ විස්තර එක්ක)
     try {
         const totalUsers = await User.countDocuments();
-        const adminMsg = `🚨 *New Player Joined!* 🚨\n\n👤 *Name:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n🌍 *Country:* ${user.country.toUpperCase()}\n🗣 *Language:* ${user.language.toUpperCase()}\n\n📊 *Total Players:* ${totalUsers} 📈`;
+        const adminMsg = `🚨 *New Player Joined!* 🚨\n\n👤 *Name:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n🌍 *Country:* ${user.country}\n🗣 *Language:* ${user.language.toUpperCase()}\n\n📊 *Total Players:* ${totalUsers} 📈`;
         await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
     } catch (error) { console.log("Admin group error", error.message); }
 
@@ -141,11 +151,12 @@ function sendMainMenu(ctx, user) {
     ctx.reply(msg, { parse_mode: 'Markdown', ...mainMenu });
 }
 
+// --- BOT MENUS ---
+
 bot.hears('🎮 Play CheckerX', (ctx) => ctx.replyWithMarkdown('👇 Click the *Play CheckerX* button at bottom left to play!'));
 
-// 🟢 ෆික්ස් කරපු Referral Link එක
 bot.hears('🔗 Referral', (ctx) => {
-    const botUsername = 'CheckerX_Official_Bot'; // හරියටම ඔයාගේ බොට්ගේ නම දැම්මා
+    const botUsername = 'CheckerX_Official_Bot'; // 🔴 ඔයාගේ බොට්ගේ නම
     ctx.replyWithMarkdown(`🔗 *YOUR REFERRAL LINK*\nShare this link with your friends to invite them to the Arena!\n\n👉 \`https://t.me/${botUsername}?start=${ctx.from.id}\``);
 });
 
@@ -155,9 +166,6 @@ bot.hears('💰 Balance', async (ctx) => {
     ctx.replyWithMarkdown(balanceMsg);
 });
 
-// ==========================================
-// --- 🟢 STEP-BY-STEP DEPOSIT SYSTEM ---
-// ==========================================
 bot.hears('📥 Deposit', (ctx) => {
     delete userStates[ctx.from.id];
     ctx.reply("📥 *SELECT DEPOSIT METHOD*\n\n_Minimum Deposit: $2.00 (200 X Coins)_\nChoose your preferred crypto network:", {
@@ -172,29 +180,17 @@ bot.hears('📥 Deposit', (ctx) => {
 bot.action(/dep_(.+)/, async (ctx) => {
     const method = ctx.match[1].toUpperCase();
     const userId = ctx.from.id;
-    
-    // 🔴 ඔයාගේ ඇඩ්‍රස් ටික මෙතන අනිවාර්යයෙන් වෙනස් කරන්න
     let address = 'Your_Wallet_Address_Here';
     if(method === 'BINANCE') address = 'Pay ID: 123456789'; 
-
     userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount' };
-
     await ctx.answerCbQuery();
     ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend your payment to this address:\n\`${address}\`\n\n👇 *How much are you depositing? (in USD)*\n_(Please type the exact dollar amount below. E.g: 5.50)_`);
 });
 
-
-// ==========================================
-// --- 🟢 STEP-BY-STEP WITHDRAWAL SYSTEM ---
-// ==========================================
 bot.hears('📤 Withdrawal', async (ctx) => {
     const userId = ctx.from.id;
     const user = await User.findOne({ id: String(userId) });
-
-    if (user.balance < 300) {
-        return ctx.replyWithMarkdown(`❌ *Insufficient Balance*\nYour balance is \`${user.balance} X Coins\`.\n_Minimum withdrawal is 300 X Coins ($3.00)._`);
-    }
-
+    if (user.balance < 300) return ctx.replyWithMarkdown(`❌ *Insufficient Balance*\nYour balance is \`${user.balance} X Coins\`.\n_Minimum withdrawal is 300 X Coins ($3.00)._`);
     userStates[userId] = { action: 'withdraw', step: 'awaiting_amount' };
     ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw?*\n_(Please type the amount below. E.g: 350)_");
 });
@@ -202,24 +198,18 @@ bot.hears('📤 Withdrawal', async (ctx) => {
 bot.action(/with_(.+)/, async (ctx) => {
     const userId = ctx.from.id;
     const state = userStates[userId];
-    
     if (!state || state.step !== 'awaiting_method') return ctx.answerCbQuery("Expired request. Please start again.", { show_alert: true });
-
     state.method = ctx.match[1].toUpperCase();
     state.step = 'awaiting_address';
-    
     await ctx.answerCbQuery();
     ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n📍 *Please paste your Wallet Address / Pay ID below:*`);
 });
 
 bot.hears('💬 Support', (ctx) => ctx.reply("💬 *Customer Support*\nClick below to chat directly with an Admin.", {
     parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard([
-        [Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')] // 🔴 ඔයාගේ Username එක දාන්න
-    ])
+    ...Markup.inlineKeyboard([[Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')]]) // 🔴 ඔයාගේ Username එක
 }));
 
-// Admin Add Coins
 bot.command('addcoins', async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
@@ -242,6 +232,28 @@ bot.on('text', async (ctx, next) => {
     const text = ctx.message.text;
     const state = userStates[userId];
 
+    // 🟢 Registration Flow - Typed Country
+    if (state && state.action === 'register' && state.step === 'awaiting_country_name') {
+        const countryName = text.trim();
+        let user = await User.findOne({ id: String(userId) });
+        if (!user) {
+            user = new User({ id: String(userId), name: ctx.from.first_name, country: countryName });
+        } else {
+            user.country = countryName;
+        }
+        await user.save();
+        delete userStates[userId];
+        
+        ctx.reply(`✅ Country set to: ${countryName}`);
+        return sendLanguageSelection(ctx);
+    }
+
+    // 🟢 යූසර් රට සහ භාෂාව තෝරලා නැත්නම් Main Menu එක පාවිච්චි කරන්න දෙන්නේ නෑ
+    let user = await User.findOne({ id: String(userId) });
+    if (user && (!user.country || !user.language)) {
+         return ctx.reply("⚠️ Please complete the setup first by using /start");
+    }
+
     if (['🎮 Play CheckerX', '💰 Balance', '📥 Deposit', '📤 Withdrawal', '🔗 Referral', '💬 Support'].includes(text)) {
         delete userStates[userId];
         return next(); 
@@ -249,11 +261,9 @@ bot.on('text', async (ctx, next) => {
 
     if (!state) return next(); 
 
-    // --- DEPOSIT FLOW ---
     if (state.action === 'deposit' && state.step === 'awaiting_amount') {
         const amount = parseFloat(text);
         if (isNaN(amount) || amount < 2) return ctx.reply("❌ Invalid amount. Minimum deposit is $2.00. Please enter a valid number:");
-        
         state.amount = amount;
         state.step = 'awaiting_txid';
         return ctx.replyWithMarkdown(`✅ Amount saved: *$${amount}*\n\n🔗 Now, please paste your *Transaction ID (TxID)* below:`);
@@ -262,26 +272,20 @@ bot.on('text', async (ctx, next) => {
     if (state.action === 'deposit' && state.step === 'awaiting_txid') {
         const txid = text;
         const user = await User.findOne({ id: String(userId) });
-        
         const adminMsg = `📥 *NEW DEPOSIT ALERT* 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amount:* $${state.amount}\n🏦 *Method:* ${state.method}\n🔗 *TxID:* \`${txid}\``;
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.log(e));
-
         ctx.replyWithMarkdown("✅ *Deposit Request Submitted!*\nAdmins will verify your TxID and credit your X Coins shortly.");
         delete userStates[userId];
         return;
     }
 
-    // --- WITHDRAW FLOW ---
     if (state.action === 'withdraw' && state.step === 'awaiting_amount') {
         const amount = parseFloat(text);
         if (isNaN(amount) || amount < 300) return ctx.reply("❌ Invalid amount. Minimum withdrawal is 300 X Coins. Try again:");
-        
         const user = await User.findOne({ id: String(userId) });
         if (user.balance < amount) return ctx.reply(`❌ Insufficient balance! Your balance is ${user.balance} X Coins.`);
-        
         state.amount = amount;
         state.step = 'awaiting_method';
-        
         return ctx.reply("✅ Amount confirmed.\n\n💳 Please select your withdrawal method:", Markup.inlineKeyboard([
             [Markup.button.callback('🔶 Binance Pay', 'with_binance'), Markup.button.callback('💵 USDT (TRC20)', 'with_usdt')],
             [Markup.button.callback('🔴 TRX (TRC20)', 'with_trx'), Markup.button.callback('🟣 Solana', 'with_sol')]
@@ -291,19 +295,14 @@ bot.on('text', async (ctx, next) => {
     if (state.action === 'withdraw' && state.step === 'awaiting_address') {
         const address = text;
         const user = await User.findOne({ id: String(userId) });
-        
         if (user.balance < state.amount) {
             delete userStates[userId];
             return ctx.reply("❌ Error: Insufficient balance.");
         }
-
-        // 🟢 ඔටෝ සල්ලි කැපීම!
         user.balance -= state.amount;
         await user.save();
-
         const adminMsg = `📤 *NEW WITHDRAWAL ALERT* 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amount:* ${state.amount} X Coins ($${(state.amount/100).toFixed(2)})\n🏦 *Method:* ${state.method}\n📍 *Address:* \`${address}\``;
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.log(e));
-
         ctx.replyWithMarkdown(`✅ *Withdrawal Successful!*\n\`${state.amount} X Coins\` have been automatically deducted from your balance. The funds will be sent to your address shortly.\n\n💰 *New Balance:* ${user.balance} X Coins`);
         delete userStates[userId];
         return;
@@ -313,7 +312,6 @@ bot.on('text', async (ctx, next) => {
 });
 
 bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.error("Bot Error:", err.message));
-
 
 // ==========================================
 // --- MULTIPLAYER ENGINE (නොවෙනස්ව තබා ඇත) ---
