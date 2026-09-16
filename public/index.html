@@ -14,12 +14,14 @@
         
         .top-bar { width: 100%; max-width: 420px; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(22, 27, 34, 0.95); position: fixed; top: 0; z-index: 10; border-bottom: 2px solid #00f2fe; box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2); }
         .user-info-box { display: flex; align-items: center; gap: 10px; }
-        .avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #00f2fe; }
+        .avatar-container { position: relative; }
+        .avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #00f2fe; display: block; }
+        .top-blink-dot { width: 9px; height: 9px; background-color: #2ea043; border-radius: 50%; border: 2px solid #161b22; position: absolute; bottom: 0; right: 0; box-shadow: 0 0 8px #2ea043; animation: blinker 1.5s linear infinite; }
+        
         .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-family: 'Roboto Mono', monospace; color: #00f2fe; font-size: 13px; text-shadow: 0 0 5px rgba(0,242,254,0.5); }
         .winrate-badge { background: rgba(241, 196, 15, 0.15); border: 1px solid #f1c40f; color: #f1c40f; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-family: 'Roboto Mono', monospace; font-weight: bold; text-align: center; }
 
         .online-indicator { font-size: 11px; color: #8b949e; display: flex; align-items: center; gap: 5px; margin-top: 2px; font-weight: 600; }
-        .blink-dot { width: 7px; height: 7px; background-color: #2ea043; border-radius: 50%; box-shadow: 0 0 8px #2ea043; animation: blinker 1.5s linear infinite; }
         @keyframes blinker { 50% { opacity: 0.3; } }
 
         .screen { display: none; width: 100%; max-width: 420px; padding: 85px 15px 20px; text-align: center; overflow-y: auto; max-height: 100vh; }
@@ -68,18 +70,21 @@
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 14, 20, 0.95); z-index: 100; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
         .modal-content { background: #161b22; border: 1px solid #00f2fe; padding: 20px; border-radius: 20px; width: 95%; max-width: 360px; text-align: center; box-shadow: 0 10px 40px rgba(0,242,254,0.2); }
-        .rules-list li { margin-bottom: 6px; text-align: left; font-size: 12px; }
+        .rules-list li { margin-bottom: 6px; text-align: left; font-size: 11px; }
     </style>
 </head>
 <body>
 
     <div class="top-bar">
         <div class="user-info-box">
-            <img src="https://via.placeholder.com/38/00f2fe/000000?text=X" class="avatar" id="userAvatar">
+            <div class="avatar-container">
+                <img src="https://via.placeholder.com/38/00f2fe/000000?text=X" class="avatar" id="userAvatar">
+                <div class="top-blink-dot"></div>
+            </div>
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
                 <span id="userName" style="font-weight: 600; font-size: 14px;">Player</span>
                 <div class="online-indicator">
-                    <div class="blink-dot"></div> <span id="onlineCount">1</span> Online
+                    <span id="onlineCount">1</span> Online
                 </div>
             </div>
         </div>
@@ -92,7 +97,7 @@
     <!-- Home Screen -->
     <div id="homeScreen" class="screen active-screen">
         <h1>CheckerX Pro</h1>
-        <p style="color: #8b949e; margin-bottom: 15px; font-size: 13px;">1vs1 Real-time Brazilian Checkers</p>
+        <p style="color: #8b949e; margin-bottom: 15px; font-size: 13px;">1vs1 Real-time Checkers Arena</p>
         
         <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 FIND MATCH</button>
         <button class="btn-primary" style="background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000;" onclick="createPrivateRoom()">👥 CREATE ROOM</button>
@@ -160,10 +165,12 @@
         <div class="modal-content">
             <h3 style="color: #00f2fe; font-family: 'Orbitron'; margin-top:0;">📜 PRO RULES</h3>
             <ul class="rules-list" style="color: #c9d1d9; line-height: 1.4; padding-left: 15px;">
-                <li><b>Majority Capture:</b> Maximum capture path is mandatory.</li>
-                <li><b>King Movement 👑:</b> Flying kings across multiple squares.</li>
-                <li><b>Time Out Loss:</b> 30s per turn. 2 misses = Defeat.</li>
-                <li><b>Economy:</b> Winner gets 180 X Coins (20% network fee).</li>
+                <li><b>1. Majority Capture:</b> You must choose the path that captures the maximum number of pieces.</li>
+                <li><b>2. King Flying Movement 👑:</b> Kings can move and fly across any number of free squares diagonally.</li>
+                <li><b>3. Turn Timer:</b> 30 seconds limit per turn. Missing 2 turns causes automatic forfeiture.</li>
+                <li><b>4. Disconnect Loss:</b> Closing browser tab or network drop results in immediate match defeat.</li>
+                <li><b>5. Match Stakes:</b> 100 X Coins per match. Winner collects 180 X Coins (20 coins platform fee).</li>
+                <li><b>6. Fair Play:</b> All matches are verified in real-time via secure server socket connection.</li>
             </ul>
             <button class="btn-primary" onclick="document.getElementById('rulesModal').style.display='none'">GOT IT</button>
         </div>
@@ -226,7 +233,7 @@
             const inviteLink = `https://t.me/${botUsername}?start=${data.roomId}`;
             
             document.getElementById('waitingTitle').innerText = "Waiting for Friend...";
-            document.getElementById('waitingDesc').innerHTML = `<b>🔗 Click here to share your link:</b><br><a href="https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('🎮 Play 1vs1 Brazilian Checkers with me on CheckerX!')}" target="_blank" style="color: #00f2fe; word-break: break-all; font-family: 'Roboto Mono'; font-size: 11px; display:inline-block; margin-top:8px;">${inviteLink}</a><br><br><i>Match starts when your friend joins!</i>`;
+            document.getElementById('waitingDesc').innerHTML = `<b>🔗 Click here to share your link:</b><br><a href="https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('🎮 Play 1vs1 Checkers with me on CheckerX!')}" target="_blank" style="color: #00f2fe; word-break: break-all; font-family: 'Roboto Mono'; font-size: 11px; display:inline-block; margin-top:8px;">${inviteLink}</a><br><br><i>Match starts when your friend joins!</i>`;
         });
 
         socket.on('online_users_list', (users) => {
@@ -356,7 +363,6 @@
             renderBoard();
         });
 
-        // 🟢 RESTORED ORIGINAL DISCONNECT & WIN EVENTS (100% Working Engine)
         socket.on('opponent_disconnected', () => showEndGame(true, "Opponent Disconnected! +180 Coins 🎉"));
         socket.on('opponent_timed_out', () => showEndGame(true, "Opponent Missed Turns! +180 Coins 🎉"));
         socket.on('you_lost_game', () => showEndGame(false, "Defeat! All your pieces were captured or time expired. ❌"));

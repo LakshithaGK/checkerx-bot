@@ -23,9 +23,11 @@ mongoose.connect(MONGO_URI)
 const userSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
     name: { type: String, default: 'Player' },
-    balance: { type: Number, default: 20 }, 
+    balance: { type: Number, default: 20 }, // $0.20 = 20 X Coins welcome bonus
     country: { type: String, default: null },
     language: { type: String, default: null },
+    referredBy: { type: String, default: null },
+    firstDepositDone: { type: Boolean, default: false },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
     history: { type: Array, default: [] },
@@ -42,13 +44,18 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-async function getUser(id, name) {
+async function getUser(id, name, referrerId = null) {
     const userId = String(id || 'guest');
     try {
         let user = await User.findOne({ id: userId });
         if (!user) {
-            const initialBalance = (userId === ADMIN_ID) ? 1000000 : 20;
-            user = new User({ id: userId, name: name || 'Player', balance: initialBalance });
+            const initialBalance = (userId === ADMIN_ID) ? 1000000 : 20; // 20 Coins ($0.20) Welcome Bonus
+            user = new User({ 
+                id: userId, 
+                name: name || 'Player', 
+                balance: initialBalance,
+                referredBy: (referrerId && referrerId !== userId) ? referrerId : null 
+            });
             await user.save();
         } else if (name && user.name !== name) {
             user.name = name;
@@ -64,10 +71,12 @@ const userStates = {};
 
 bot.start(async (ctx) => {
     const userId = String(ctx.from.id);
-    let user = await User.findOne({ id: userId });
+    const payload = ctx.startPayload;
+    let referrerId = (payload && !payload.startsWith('room_')) ? payload : null;
+
+    let user = await getUser(userId, ctx.from.first_name, referrerId);
     delete userStates[userId]; 
 
-    const payload = ctx.startPayload;
     if (payload && payload.startsWith('room_')) {
         if (!user || !user.country || !user.language) {
             return ctx.reply("🌍 *Welcome to CheckerX!*\nPlease complete your quick setup first using /start");
@@ -136,7 +145,7 @@ bot.action(/lang_(.+)/, async (ctx) => {
         await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
     } catch (error) { console.log("Admin group error", error.message); }
 
-    const rulesMsg = lang === 'pt' ? `📜 *Regras do CheckerX:*\n1. Captura obrigatória.\n2. Timeout de 30s = Perda.\n3. Taxa de rede: 20%.` : `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 30s Timeout = Loss.\n3. Network Fee: 20%.`;
+    const rulesMsg = lang === 'pt' ? `📜 *Regras do CheckerX:*\n1. Captura obrigatória.\n2. Timeout de 30s = Perda.\n3. Taxa de rede: 20%.\n\n🎁 *Você ganhou 20 X Coins ($0.20) de bônus de boas-vindas!*` : `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 30s Timeout = Loss.\n3. Network Fee: 20%.\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*`;
     await ctx.replyWithMarkdown(rulesMsg);
     sendMainMenu(ctx, user);
 });
@@ -154,7 +163,7 @@ function sendMainMenu(ctx, user) {
 bot.hears('🎮 Play CheckerX', (ctx) => ctx.replyWithMarkdown('👇 Click the *Play CheckerX* button at bottom left to play!'));
 bot.hears('🔗 Referral', (ctx) => {
     const botUsername = 'CheckerX_Official_Bot';
-    ctx.replyWithMarkdown(`🔗 *YOUR REFERRAL LINK*\nShare this link with your friends to invite them to the Arena!\n\n👉 \`https://t.me/${botUsername}?start=${ctx.from.id}\``);
+    ctx.replyWithMarkdown(`🔗 *REFERRAL PROGRAM*\nInvite friends and earn *10 X Coins ($0.10)* when they make their first deposit ($2+ min)!\n\n👇 *Your Referral Link:*\n\`https://t.me/${botUsername}?start=${ctx.from.id}\``);
 });
 bot.hears('💰 Balance', async (ctx) => {
     const user = await User.findOne({ id: String(ctx.from.id) });
@@ -199,6 +208,7 @@ bot.action(/with_(.+)/, async (ctx) => {
     ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n📍 *Paste your Wallet Address below:*`);
 });
 bot.hears('💬 Support', (ctx) => ctx.reply("💬 *Customer Support*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')]]) }));
+
 bot.command('addcoins', async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
@@ -231,10 +241,30 @@ bot.on('text', async (ctx, next) => {
         return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}*\n\n🔗 Paste your *TxID* below:`);
     }
     if (state.action === 'deposit' && state.step === 'awaiting_txid') {
-        const adminMsg = `📥 *NEW DEPOSIT*\n👤 *User:* ${user.name}\n💸 *Amt:* $${state.amount}\n🔗 *TxID:* \`${text}\``;
-        bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e=>{});
-        ctx.replyWithMarkdown("✅ *Deposit Submitted!*");
-        delete userStates[userId]; return;
+        // 🟢 Check First Deposit & Reward Referrer ($0.10 = 10 Coins)
+        if (!user.firstDepositDone && state.amount >= 2.0) {
+            user.firstDepositDone = true;
+            await user.save();
+            if (user.referredBy) {
+                let referrer = await User.findOne({ id: user.referredBy });
+                if (referrer) {
+                    referrer.balance += 10; // 10 X Coins ($0.10)
+                    await referrer.save();
+                    bot.telegram.sendMessage(referrer.id, `🎉 *Referral Bonus!* Your invited friend made their first deposit. You earned *10 X Coins ($0.10)*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
+                }
+            }
+        }
+
+        // 🟢 Send Deposit Request to Admin Group with Direct User Contact Button
+        const adminMsg = `📥 *NEW DEPOSIT* 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount}\n🔗 *TxID:* \`${text}\``;
+        bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.url('💬 Contact User', `tg://user?id=${user.id}`)]])
+        }).catch(e=>{});
+
+        ctx.replyWithMarkdown("✅ *Deposit Submitted Successfully!* Admins will verify your TxID.");
+        delete userStates[userId]; 
+        return;
     }
     if (state.action === 'withdraw' && state.step === 'awaiting_amount') {
         state.amount = parseFloat(text); state.step = 'awaiting_method';
@@ -245,10 +275,17 @@ bot.on('text', async (ctx, next) => {
     }
     if (state.action === 'withdraw' && state.step === 'awaiting_address') {
         user.balance -= state.amount; await user.save();
-        const adminMsg = `📤 *NEW WITHDRAWAL*\n👤 *User:* ${user.name}\n💸 *Amt:* ${state.amount} Coins\n📍 *Addr:* \`${text}\``;
-        bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e=>{});
-        ctx.replyWithMarkdown(`✅ *Withdrawal Successful!* New Balance: ${user.balance} Coins`);
-        delete userStates[userId]; return;
+        
+        // 🟢 Send Withdrawal Request to Admin Group with Direct User Contact Button
+        const adminMsg = `📤 *NEW WITHDRAWAL* 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* ${state.amount} Coins\n📍 *Addr:* \`${text}\``;
+        bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.url('💬 Contact User', `tg://user?id=${user.id}`)]])
+        }).catch(e=>{});
+
+        ctx.replyWithMarkdown(`✅ *Withdrawal Request Submitted!* New Balance: ${user.balance} Coins`);
+        delete userStates[userId]; 
+        return;
     }
     return next();
 });
@@ -367,7 +404,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🟢 RESTORED ORIGINAL STABLE handleWin (Fixes 0 timer hang & restores exact event names)
     async function handleWin(winnerSocket, loserSocket, eventName, reason = "Normal Win") {
         if (!winnerSocket || !winnerSocket.userId) return;
         try {
