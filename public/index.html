@@ -17,10 +17,9 @@
         .avatar-container { position: relative; }
         .avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #00f2fe; display: block; }
         
-        .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-family: 'Roboto Mono', monospace; color: #00f2fe; font-size: 13px; text-shadow: 0 0 5px rgba(0,242,254,0.5); }
+        .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-family: 'Roboto Mono', monospace; color: #00f2fe; font-size: 12px; text-shadow: 0 0 5px rgba(0,242,254,0.5); text-align: right; }
         .winrate-badge { background: rgba(241, 196, 15, 0.15); border: 1px solid #f1c40f; color: #f1c40f; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-family: 'Roboto Mono', monospace; font-weight: bold; text-align: center; }
 
-        /* 🟢 Top-left Blink Online Counter */
         .online-indicator { font-size: 11px; color: #8b949e; display: flex; align-items: center; gap: 5px; margin-top: 2px; font-weight: 600; }
         .blink-dot { width: 7px; height: 7px; background-color: #2ea043; border-radius: 50%; box-shadow: 0 0 8px #2ea043; animation: blinker 1.5s linear infinite; display: inline-block; }
         @keyframes blinker { 50% { opacity: 0.3; } }
@@ -34,7 +33,7 @@
         .btn-primary:active { transform: scale(0.95); }
         .btn-secondary { background: transparent; color: #00f2fe; border: 2px solid #00f2fe; padding: 10px 20px; font-weight: 600; border-radius: 25px; cursor: pointer; margin-top: 8px; width: 90%; transition: 0.3s; font-size: 13px; }
         
-        .stake-box { background: rgba(22, 27, 34, 0.8); border: 2px solid #00f2fe; padding: 20px; border-radius: 20px; width: 90%; margin: 20px 0; color: #00f2fe; font-size: 22px; font-weight: bold; font-family: 'Roboto Mono', monospace; box-shadow: 0 0 25px rgba(0,242,254,0.3); }
+        .stake-box { background: rgba(22, 27, 34, 0.8); border: 2px solid #00f2fe; padding: 20px; border-radius: 20px; width: 90%; margin: 20px 0; color: #00f2fe; font-size: 20px; font-weight: bold; font-family: 'Roboto Mono', monospace; box-shadow: 0 0 25px rgba(0,242,254,0.3); }
         
         .section-box { width: 90%; background: rgba(22, 27, 34, 0.6); border: 1px solid #30363d; border-radius: 15px; padding: 12px; margin-top: 15px; text-align: left; }
         .section-title { font-size: 12px; font-family: 'Orbitron'; color: #00f2fe; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
@@ -81,8 +80,8 @@
                 </div>
             </div>
         </div>
-        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
-            <div class="balance-pill">💰 <span id="userBalance">0</span></div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+            <div class="balance-pill">💰 <span id="userBalance">0</span> X Coins<br><span id="userBalanceUSD" style="font-size: 10px; color: #8b949e;">($0.00)</span></div>
             <div class="winrate-badge" id="winRateBadge">🏆 Win: 0%</div>
         </div>
     </div>
@@ -107,7 +106,7 @@
     <!-- Stake Screen -->
     <div id="stakeScreen" class="screen">
         <h2 style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom: 0;">MATCH STAKE</h2>
-        <div class="stake-box">💰 100 X Coins<br><span style="font-size: 13px; font-weight: normal; color: #8b949e; font-family: 'Poppins', sans-serif;">($1.00)</span></div>
+        <div class="stake-box">💰 100 X Coins<br><span style="font-size: 13px; font-weight: normal; color: #8b949e; font-family: 'Poppins', sans-serif;">($1.00 USD)</span></div>
         <button class="btn-primary" onclick="startMatchmaking()">START SEARCH</button>
         <button class="btn-secondary" onclick="navTo('homeScreen')">BACK</button>
     </div>
@@ -116,7 +115,7 @@
     <div id="waitingScreen" class="screen">
         <h2 style="font-family: 'Orbitron'; color: #00f2fe;" id="waitingTitle">Scanning Arena...</h2>
         <div class="loader"></div>
-        <p style="color: #c9d1d9;" id="waitingDesc">Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins</b></p>
+        <p style="color: #c9d1d9;" id="waitingDesc">Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins ($1.00)</b></p>
         <button class="btn-secondary" style="border-color:#ff4757; color:#ff4757; margin-top:25px;" onclick="cancelMatchmaking()">CANCEL</button>
     </div>
 
@@ -141,7 +140,7 @@
     <div id="gameEndModal" class="modal">
         <div class="modal-content">
             <h1 id="endResultTitle" style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom:8px; font-size: 24px;">VICTORY!</h1>
-            <p id="endResultDesc" style="color: #c9d1d9; font-size: 13px; margin-bottom: 20px; font-family: 'Roboto Mono', monospace;">You won 180 X Coins</p>
+            <p id="endResultDesc" style="color: #c9d1d9; font-size: 13px; margin-bottom: 20px; font-family: 'Roboto Mono', monospace;">You won 180 X Coins ($1.80)</p>
             <button class="btn-primary" onclick="navTo('homeScreen'); document.getElementById('gameEndModal').style.display='none';">MAIN MENU</button>
         </div>
     </div>
@@ -155,7 +154,7 @@
                 <li><b>2. King Flying Movement 👑:</b> Kings can move and fly across any number of free squares diagonally.</li>
                 <li><b>3. Turn Timer:</b> 30 seconds limit per turn. Missing 2 turns causes automatic forfeiture.</li>
                 <li><b>4. Disconnect Loss:</b> Closing browser tab or network drop results in immediate match defeat.</li>
-                <li><b>5. Match Stakes:</b> 100 X Coins per match. Winner collects 180 X Coins (20 coins platform fee).</li>
+                <li><b>5. Match Stakes:</b> 100 X Coins ($1.00) per match. Winner collects 180 X Coins ($1.80) (20 coins platform fee).</li>
                 <li><b>6. Fair Play:</b> All matches are verified in real-time via secure server socket connection.</li>
             </ul>
             <button class="btn-primary" onclick="document.getElementById('rulesModal').style.display='none'">GOT IT</button>
@@ -207,7 +206,7 @@
         }, 1000);
 
         function createPrivateRoom() {
-            if (userBalance < 100) return alert('Insufficient Balance! Please deposit coins to create a room.');
+            if (userBalance < 100) return alert('Insufficient Balance! You need at least 100 X Coins ($1.00).');
             navTo('waitingScreen');
             document.getElementById('waitingTitle').innerText = "Creating Room...";
             document.getElementById('waitingDesc').innerText = "Generating invite link...";
@@ -229,7 +228,9 @@
 
         socket.on('user_synced', (data) => {
             userBalance = data.balance;
+            const usd = (userBalance / 100).toFixed(2);
             document.getElementById('userBalance').innerText = userBalance.toLocaleString();
+            document.getElementById('userBalanceUSD').innerText = `($${usd})`;
             document.getElementById('userName').innerText = data.name;
             if (data.winRate !== undefined) {
                 document.getElementById('winRateBadge').innerText = `🏆 Win: ${data.winRate}%`;
@@ -252,7 +253,7 @@
                 const isWin = h.result === 'WIN';
                 item.innerHTML = `
                     <span>⚔️ vs ${h.opponent}</span>
-                    <span class="${isWin ? 'history-win' : 'history-loss'}">${isWin ? '👑 WIN (+180)' : '❌ LOSS (-100)'}</span>
+                    <span class="${isWin ? 'history-win' : 'history-loss'}">${isWin ? '👑 WIN (+180 X Coins)' : '❌ LOSS (-100 X Coins)'}</span>
                 `;
                 hList.appendChild(item);
             });
@@ -271,10 +272,10 @@
         }
 
         function startMatchmaking() {
-            if (userBalance < 100) return alert('Insufficient Balance! Please deposit coins to play.');
+            if (userBalance < 100) return alert('Insufficient Balance! You need at least 100 X Coins ($1.00) to play.');
             navTo('waitingScreen');
             document.getElementById('waitingTitle').innerText = "Scanning Arena...";
-            document.getElementById('waitingDesc').innerHTML = `Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins</b>`;
+            document.getElementById('waitingDesc').innerHTML = `Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins ($1.00)</b>`;
             socket.emit('find_match', { userId: tgUser.id });
         }
 
@@ -324,8 +325,8 @@
             renderBoard();
         });
 
-        socket.on('opponent_disconnected', () => showEndGame(true, "Opponent Disconnected! +180 Coins 🎉"));
-        socket.on('opponent_timed_out', () => showEndGame(true, "Opponent Missed Turns! +180 Coins 🎉"));
+        socket.on('opponent_disconnected', () => showEndGame(true, "Opponent Disconnected! +180 X Coins ($1.80) 🎉"));
+        socket.on('opponent_timed_out', () => showEndGame(true, "Opponent Missed Turns! +180 X Coins ($1.80) 🎉"));
         socket.on('you_lost_game', () => showEndGame(false, "Defeat! All your pieces were captured or time expired. ❌"));
 
         function startTurnTimer() {
@@ -382,7 +383,7 @@
         function checkWinCondition() {
             let enemyPieces = 0;
             for(let r=0; r<8; r++) for(let c=0; c<8; c++) if(boardState[r][c] && boardState[r][c].color !== myRole) enemyPieces++;
-            if (enemyPieces === 0) { socket.emit('game_won'); showEndGame(true, "Flawless Victory! +180 Coins 🎉"); }
+            if (enemyPieces === 0) { socket.emit('game_won'); showEndGame(true, "Flawless Victory! +180 X Coins ($1.80) 🎉"); }
         }
 
         function showEndGame(isWin, desc) {

@@ -142,7 +142,8 @@ async function sendWelcomeAndMenu(ctx, user) {
 }
 
 function sendMainMenu(ctx, user) {
-    const msg = `🎮 *Main Menu*\n💰 Balance: ${user.balance} X Coins`;
+    const usdVal = (user.balance / 100).toFixed(2);
+    const msg = `🎮 *Main Menu*\n💰 Balance: ${user.balance.toLocaleString()} X Coins ($${usdVal})`;
     const mainMenu = Markup.keyboard([
         ['🎮 Play CheckerX', '💰 Balance'],
         ['📥 Deposit', '📤 Withdrawal'],
@@ -169,11 +170,11 @@ bot.hears('💰 Balance', async (ctx) => {
     if (user && user.isBanned) return;
     const totalMatches = user.wins + user.losses;
     const winRate = totalMatches > 0 ? Math.round((user.wins / totalMatches) * 100) : 0;
-    const balanceMsg = `🏦 *CHECKERX WALLET* 🏦\n━━━━━━━━━━━━━━━━━━\n👤 *User:* ${user.name}\n💰 *Balance:* \`${user.balance.toLocaleString()} X Coins\`\n🏆 *Win Rate:* ${winRate}% (${user.wins}W / ${user.losses}L)\n━━━━━━━━━━━━━━━━━━`;
+    const usdVal = (user.balance / 100).toFixed(2);
+    const balanceMsg = `🏦 *CHECKERX WALLET* 🏦\n━━━━━━━━━━━━━━━━━━\n👤 *User:* ${user.name}\n💰 *Balance:* \`${user.balance.toLocaleString()} X Coins ($${usdVal})\`\n🏆 *Win Rate:* ${winRate}% (${user.wins}W / ${user.losses}L)\n━━━━━━━━━━━━━━━━━━`;
     ctx.replyWithMarkdown(balanceMsg);
 });
 
-// 🟢 Updated Deposit Methods (Low Fee Coins + Binance, No Solana)
 bot.hears('📥 Deposit', async (ctx) => {
     const user = await User.findOne({ id: String(ctx.from.id) });
     if (user && user.isBanned) return;
@@ -214,13 +215,13 @@ bot.hears('📤 Withdrawal', async (ctx) => {
         return ctx.replyWithMarkdown(`❌ *Withdrawal Denied!*\n\nYou must play at least **1 Match** before making a withdrawal.\n\n🎮 Click 'Play CheckerX' to join a match!`);
     }
 
-    if (user.balance < 300) return ctx.replyWithMarkdown(`❌ *Insufficient Balance!* You need at least 300 X Coins ($3.00) to withdraw.\nYour Balance: ${user.balance}`);
+    if (user.balance < 300) return ctx.replyWithMarkdown(`❌ *Insufficient Balance!* You need at least 300 X Coins ($3.00) to withdraw.\nYour Balance: ${user.balance} X Coins ($${(user.balance/100).toFixed(2)})`);
     
     userStates[userId] = { action: 'withdraw', step: 'awaiting_amount' };
-    ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw? (Min 300)*");
+    ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw? (Min 300 X Coins / $3.00)*");
 });
 
-// 🟢 Updated Withdrawal Methods (No Solana, Added low fee options)
+// 🟢 FIX: Added strict TRC20 warnings for crypto withdrawals
 bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     const userId = ctx.from.id;
     const state = userStates[userId];
@@ -231,7 +232,7 @@ bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     
     let promptMsg = state.method === 'BINANCE' 
         ? '📍 *Paste your Binance Pay ID or Binance Email below:*' 
-        : `📍 *Paste your ${state.method} Address below:*`;
+        : `📍 *Paste your ${state.method} TRC20 Wallet Address below (Make sure it is TRC20 network):*`;
         
     ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n${promptMsg}`);
 });
@@ -332,8 +333,8 @@ bot.action(/^approve_dep_(\d+)_([\d.]+)$/, async (ctx) => {
         }
         await user.save();
         
-        ctx.editMessageText(`✅ *DEPOSIT APPROVED*\n\n👤 User ID: \`${targetId}\`\n💸 Amount: $${amountUSD}\n💰 Added: ${coinsToAdd} X Coins\n\n✅ Transaction Completed!`, { parse_mode: 'Markdown' });
-        bot.telegram.sendMessage(targetId, `✅ *Deposit Approved!*\n*${coinsToAdd} X Coins* have been added to your balance.`, { parse_mode: 'Markdown' }).catch(e=>{});
+        ctx.editMessageText(`✅ *DEPOSIT APPROVED*\n\n👤 User ID: \`${targetId}\`\n💸 Amount: $${amountUSD}\n💰 Added: ${coinsToAdd} X Coins ($${amountUSD.toFixed(2)})\n\n✅ Transaction Completed!`, { parse_mode: 'Markdown' });
+        bot.telegram.sendMessage(targetId, `✅ *Deposit Approved!*\n*${coinsToAdd} X Coins ($${amountUSD.toFixed(2)})* have been added to your balance.`, { parse_mode: 'Markdown' }).catch(e=>{});
     } catch (e) {
         ctx.answerCbQuery("Error approving deposit.");
     }
@@ -350,14 +351,16 @@ bot.action(/^approve_wit_(\d+)_([\d.]+)$/, async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID && String(ctx.chat.id) !== ADMIN_GROUP_ID) return ctx.answerCbQuery("❌ Admin only!");
     const targetId = ctx.match[1];
     const amount = parseFloat(ctx.match[2]);
-    ctx.editMessageText(`✅ *WITHDRAWAL PAID*\n\n👤 User ID: \`${targetId}\`\n💸 Amount: ${amount} Coins\n\n✅ Successfully Processed!`, { parse_mode: 'Markdown' });
-    bot.telegram.sendMessage(targetId, `✅ *Withdrawal Successful!*\nYour request for ${amount} X Coins has been paid.`, { parse_mode: 'Markdown' }).catch(e=>{});
+    const usdVal = (amount / 100).toFixed(2);
+    ctx.editMessageText(`✅ *WITHDRAWAL PAID*\n\n👤 User ID: \`${targetId}\`\n💸 Amount: ${amount} Coins ($${usdVal})\n\n✅ Successfully Processed!`, { parse_mode: 'Markdown' });
+    bot.telegram.sendMessage(targetId, `✅ *Withdrawal Successful!*\nYour request for ${amount} X Coins ($${usdVal}) has been paid.`, { parse_mode: 'Markdown' }).catch(e=>{});
 });
 
 bot.action(/^reject_wit_(\d+)_([\d.]+)$/, async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID && String(ctx.chat.id) !== ADMIN_GROUP_ID) return ctx.answerCbQuery("❌ Admin only!");
     const targetId = ctx.match[1];
     const amount = parseFloat(ctx.match[2]);
+    const usdVal = (amount / 100).toFixed(2);
     
     try {
         let user = await User.findOne({ id: targetId });
@@ -365,8 +368,8 @@ bot.action(/^reject_wit_(\d+)_([\d.]+)$/, async (ctx) => {
             user.balance += amount; 
             await user.save();
         }
-        ctx.editMessageText(`❌ *WITHDRAWAL REJECTED*\n\n👤 User ID: \`${targetId}\`\n💸 Amount: ${amount} Coins\n\n🚫 Coins refunded to user.`, { parse_mode: 'Markdown' });
-        bot.telegram.sendMessage(targetId, `❌ *Withdrawal Rejected!*\nYour request for ${amount} X Coins was declined. The coins have been refunded to your balance.`, { parse_mode: 'Markdown' }).catch(e=>{});
+        ctx.editMessageText(`❌ *WITHDRAWAL REJECTED*\n\n👤 User ID: \`${targetId}\`\n💸 Amount: ${amount} Coins ($${usdVal})\n\n🚫 Coins refunded to user.`, { parse_mode: 'Markdown' });
+        bot.telegram.sendMessage(targetId, `❌ *Withdrawal Rejected!*\nYour request for ${amount} X Coins ($${usdVal}) was declined. The coins have been refunded to your balance.`, { parse_mode: 'Markdown' }).catch(e=>{});
     } catch (e) {
         ctx.answerCbQuery("Error refunding.");
     }
@@ -441,8 +444,8 @@ bot.on('text', async (ctx, next) => {
             }
             u.balance += amount; 
             await u.save();
-            ctx.reply(`✅ *Success!*\nAdded ${amount} X Coins to ${u.name}.\nNew Balance: ${u.balance}`, {parse_mode: 'Markdown'});
-            bot.telegram.sendMessage(state.targetId, `🎁 *Admin Reward:* You received *${amount} X Coins*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
+            ctx.reply(`✅ *Success!*\nAdded ${amount} X Coins ($${(amount/100).toFixed(2)}) to ${u.name}.\nNew Balance: ${u.balance} Coins`, {parse_mode: 'Markdown'});
+            bot.telegram.sendMessage(state.targetId, `🎁 *Admin Reward:* You received *${amount} X Coins ($${(amount/100).toFixed(2)})*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
         } catch(e) { ctx.reply("❌ Error."); }
         delete userStates[userId];
         return;
@@ -467,7 +470,7 @@ bot.on('text', async (ctx, next) => {
             }
             u.balance = Math.max(0, u.balance - amount); 
             await u.save();
-            ctx.reply(`✅ *Success!*\nRemoved ${amount} X Coins from ${u.name}.\nNew Balance: ${u.balance}`, {parse_mode: 'Markdown'});
+            ctx.reply(`✅ *Success!*\nRemoved ${amount} X Coins from ${u.name}.\nNew Balance: ${u.balance} Coins`, {parse_mode: 'Markdown'});
         } catch(e) { ctx.reply("❌ Error."); }
         delete userStates[userId];
         return;
@@ -498,11 +501,11 @@ bot.on('text', async (ctx, next) => {
         state.step = 'awaiting_txid';
         
         let idType = state.method === 'BINANCE' ? '*Binance Pay ID / Email*' : '*TxID (Transaction Hash)*';
-        return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}*\n\n🔗 Paste your ${idType} below:`);
+        return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}* (${state.amount * 100} X Coins)\n\n🔗 Paste your ${idType} below:`);
     }
 
     if (state.action === 'deposit' && state.step === 'awaiting_txid') {
-        const adminMsg = `📥 *NEW DEPOSIT* (${state.method}) 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount}\n🔗 *TxID:* \`${text}\``;
+        const adminMsg = `📥 *NEW DEPOSIT* (${state.method}) 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount} (${state.amount * 100} Coins)\n🔗 *TxID:* \`${text}\``;
         
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
             parse_mode: 'Markdown',
@@ -526,12 +529,10 @@ bot.on('text', async (ctx, next) => {
             return ctx.reply("⚠️ *Error:* Minimum withdrawal is 300 X Coins ($3.00). Please enter a valid number:", { parse_mode: 'Markdown' });
         }
         if (amount > user.balance) {
-            return ctx.reply(`❌ *Insufficient Balance!* You only have ${user.balance} X Coins.`, { parse_mode: 'Markdown' });
+            return ctx.reply(`❌ *Insufficient Balance!* You only have ${user.balance} X Coins ($${(user.balance/100).toFixed(2)}).`, { parse_mode: 'Markdown' });
         }
         state.amount = amount; 
         state.step = 'awaiting_method';
-        
-        // 🟢 Updated Withdrawal Method Selection (No Solana, Low Fee Coins)
         return ctx.reply("💳 Select withdrawal method:", Markup.inlineKeyboard([
             [Markup.button.callback('🔶 Binance', 'with_binance'), Markup.button.callback('💵 USDT', 'with_usdt')],
             [Markup.button.callback('🔴 TRX', 'with_trx'), Markup.button.callback('💎 TON', 'with_ton')]
@@ -546,8 +547,8 @@ bot.on('text', async (ctx, next) => {
         user.balance -= state.amount; 
         await user.save();
         
-        // 🟢 FIX: Added Payment Method to the Admin Withdrawal Notification
-        const adminMsg = `📤 *NEW WITHDRAWAL* (${state.method}) 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💰 *Avail. Bal:* \`${user.balance} Coins\`\n💸 *Req. Amt:* ${state.amount} Coins\n📍 *Addr:* \`${text}\``;
+        const usdVal = (state.amount / 100).toFixed(2);
+        const adminMsg = `📤 *NEW WITHDRAWAL* (${state.method}) 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💰 *Avail. Bal:* \`${user.balance} Coins ($${(user.balance/100).toFixed(2)})\`\n💸 *Req. Amt:* ${state.amount} Coins ($${usdVal})\n📍 *Addr:* \`${text}\``;
         
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
             parse_mode: 'Markdown',
@@ -560,7 +561,7 @@ bot.on('text', async (ctx, next) => {
             }
         }).catch(e=>{});
         
-        ctx.replyWithMarkdown(`✅ *Withdrawal Request Submitted!* New Balance: ${user.balance} Coins`);
+        ctx.replyWithMarkdown(`✅ *Withdrawal Request Submitted!* New Balance: ${user.balance} X Coins ($${(user.balance/100).toFixed(2)})`);
         delete userStates[userId]; 
         return;
     }
@@ -609,7 +610,7 @@ io.on('connection', (socket) => {
         try {
             const user = await getUser(socket.userId, socket.userName);
             if (user.isBanned) return socket.emit('error_message', '❌ You are banned.');
-            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance! You need at least 100 Coins.');
+            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance! You need at least 100 X Coins ($1.00).');
             
             const roomId = `room_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
             socket.join(roomId);
@@ -634,7 +635,7 @@ io.on('connection', (socket) => {
                 return;
             }
             if (!u2 || u2.balance < 100) {
-                return socket.emit('error_message', 'Insufficient Balance! You need at least 100 Coins.');
+                return socket.emit('error_message', 'Insufficient Balance! You need at least 100 X Coins ($1.00).');
             }
 
             socket.join(data.roomId);
@@ -658,7 +659,7 @@ io.on('connection', (socket) => {
         try {
             const uCurrent = await User.findOne({ id: socket.userId });
             if (!uCurrent || uCurrent.isBanned) return socket.emit('error_message', '❌ You are banned from playing.');
-            if (uCurrent.balance < 100) return socket.emit('error_message', 'Insufficient Balance! You need at least 100 Coins.');
+            if (uCurrent.balance < 100) return socket.emit('error_message', 'Insufficient Balance! You need at least 100 X Coins ($1.00).');
 
             if (waitingPlayers.length > 0 && waitingPlayers[0].id !== socket.id) {
                 const opponent = waitingPlayers.shift();
