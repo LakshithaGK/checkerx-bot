@@ -92,7 +92,7 @@
         <p style="color: #8b949e; margin-bottom: 15px; font-size: 13px;">1vs1 Real-time Checkers Arena</p>
         
         <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 FIND MATCH</button>
-        <button class="btn-primary" style="background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000;" onclick="createPrivateRoom()">👥 CREATE ROOM</button>
+        <button class="btn-primary" style="background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000;" onclick="openRoomStakeMenu()">👥 CREATE ROOM</button>
         <button class="btn-secondary" onclick="document.getElementById('rulesModal').style.display='flex'">📜 GAME RULES</button>
 
         <div class="section-box" style="margin-top: 15px; margin-bottom: 15px;">
@@ -103,7 +103,21 @@
         </div>
     </div>
 
-    <!-- Stake Screen -->
+    <!-- Create Room Stake Selection Screen -->
+    <div id="createRoomStakeScreen" class="screen">
+        <h2 style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom: 2px;">CREATE PRIVATE ROOM</h2>
+        <p style="color: #8b949e; font-size: 12px; margin-bottom: 15px;">Select match stake amount:</p>
+        <div style="display: flex; flex-direction: column; gap: 8px; width: 90%;">
+            <button class="btn-primary" style="margin-top:0;" onclick="confirmCreateRoom(50)">💰 50 X Coins ($0.50)</button>
+            <button class="btn-primary" style="margin-top:0;" onclick="confirmCreateRoom(100)">💰 100 X Coins ($1.00)</button>
+            <button class="btn-primary" style="margin-top:0;" onclick="confirmCreateRoom(200)">💰 200 X Coins ($2.00)</button>
+            <button class="btn-primary" style="margin-top:0;" onclick="confirmCreateRoom(500)">💰 500 X Coins ($5.00)</button>
+            <button class="btn-primary" style="margin-top:0;" onclick="confirmCreateRoom(1000)">💰 1000 X Coins ($10.00)</button>
+        </div>
+        <button class="btn-secondary" style="margin-top: 15px;" onclick="navTo('homeScreen')">BACK</button>
+    </div>
+
+    <!-- Stake Screen for Random Find Match -->
     <div id="stakeScreen" class="screen">
         <h2 style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom: 0;">MATCH STAKE</h2>
         <div class="stake-box">💰 100 X Coins<br><span style="font-size: 13px; font-weight: normal; color: #8b949e; font-family: 'Poppins', sans-serif;">($1.00 USD)</span></div>
@@ -136,6 +150,21 @@
         </div>
     </div>
 
+    <!-- Join Room Confirmation Modal -->
+    <div id="confirmJoinModal" class="modal">
+        <div class="modal-content">
+            <h2 style="font-family: 'Orbitron'; color: #00f2fe; margin-top:0; font-size: 20px;">⚔️ JOIN MATCH</h2>
+            <p style="color: #8b949e; font-size: 12px; margin-bottom: 12px;">You have been invited to a private match!</p>
+            <div style="background: rgba(22, 27, 34, 0.9); border: 1px solid #00f2fe; padding: 12px; border-radius: 12px; margin-bottom: 15px; text-align: left; font-size: 12px;">
+                <div style="margin-bottom: 6px;">👤 <b>Invited by:</b> <span id="inviteCreatorName" style="color:#00f2fe; font-weight:bold;">Player</span></div>
+                <div style="margin-bottom: 6px;">💰 <b>Match Stake:</b> <span id="inviteStakeAmount" style="color:#f1c40f; font-weight:bold;">100 X Coins ($1.00)</span></div>
+                <div>🏆 <b>Winner Prize:</b> <span id="invitePrizeAmount" style="color:#2ea043; font-weight:bold;">180 X Coins ($1.80)</span></div>
+            </div>
+            <button class="btn-primary" id="btnConfirmJoin" style="margin-top:0;">✅ CONFIRM & PLAY</button>
+            <button class="btn-secondary" style="border-color:#ff4757; color:#ff4757; margin-top:8px;" onclick="document.getElementById('confirmJoinModal').style.display='none'; navTo('homeScreen');">❌ DECLINE</button>
+        </div>
+    </div>
+
     <!-- End Modal -->
     <div id="gameEndModal" class="modal">
         <div class="modal-content">
@@ -154,7 +183,7 @@
                 <li><b>2. King Flying Movement 👑:</b> Kings can move and fly across any number of free squares diagonally.</li>
                 <li><b>3. Turn Timer:</b> 30 seconds limit per turn. Missing 2 turns causes automatic forfeiture.</li>
                 <li><b>4. Disconnect Loss:</b> Closing browser tab or network drop results in immediate match defeat.</li>
-                <li><b>5. Match Stakes:</b> 100 X Coins ($1.00) per match. Winner collects 180 X Coins ($1.80) (20 coins platform fee).</li>
+                <li><b>5. Network Fee:</b> 20% platform fee on total stake. Winner takes 90% of combined stakes.</li>
                 <li><b>6. Fair Play:</b> All matches are verified in real-time via secure server socket connection.</li>
             </ul>
             <button class="btn-primary" onclick="document.getElementById('rulesModal').style.display='none'">GOT IT</button>
@@ -170,6 +199,8 @@
         let myName = tgUser.first_name || 'Player 1';
         let opponentName = 'Player 2';
         let userBalance = 0;
+        let currentMatchStake = 100;
+        let currentMatchPrize = 180;
 
         let myRole = ''; 
         let currentTurn = 'red';
@@ -198,27 +229,53 @@
 
         setTimeout(() => {
             if (startParam && startParam.startsWith('room_')) {
-                navTo('waitingScreen');
-                document.getElementById('waitingTitle').innerText = "Joining Room...";
-                document.getElementById('waitingDesc').innerText = "Connecting with friend...";
-                socket.emit('join_room', { roomId: startParam, userId: tgUser.id });
+                socket.emit('get_room_info', { roomId: startParam });
             }
         }, 1000);
 
-        function createPrivateRoom() {
-            if (userBalance < 100) return alert('Insufficient Balance! You need at least 100 X Coins ($1.00).');
+        socket.on('room_info_res', (data) => {
+            if (data.exists) {
+                const prize = Math.floor(data.stake * 1.8);
+                document.getElementById('inviteCreatorName').innerText = data.creatorName;
+                document.getElementById('inviteStakeAmount').innerText = `${data.stake} X Coins ($${(data.stake/100).toFixed(2)})`;
+                document.getElementById('invitePrizeAmount').innerText = `${prize} X Coins ($${(prize/100).toFixed(2)})`;
+                
+                const btn = document.getElementById('btnConfirmJoin');
+                btn.onclick = () => {
+                    document.getElementById('confirmJoinModal').style.display = 'none';
+                    navTo('waitingScreen');
+                    document.getElementById('waitingTitle').innerText = "Joining Room...";
+                    document.getElementById('waitingDesc').innerText = "Connecting with friend...";
+                    socket.emit('join_room', { roomId: data.roomId, userId: tgUser.id });
+                };
+                
+                document.getElementById('confirmJoinModal').style.display = 'flex';
+            } else {
+                alert("Room expired or match has already started!");
+                navTo('homeScreen');
+            }
+        });
+
+        function openRoomStakeMenu() {
+            navTo('createRoomStakeScreen');
+        }
+
+        function confirmCreateRoom(stake) {
+            if (userBalance < stake) return alert(`Insufficient Balance! You need at least ${stake} X Coins ($${(stake/100).toFixed(2)}).`);
             navTo('waitingScreen');
             document.getElementById('waitingTitle').innerText = "Creating Room...";
             document.getElementById('waitingDesc').innerText = "Generating invite link...";
-            socket.emit('create_room', { userId: tgUser.id });
+            socket.emit('create_room', { userId: tgUser.id, stake: stake });
         }
 
         socket.on('room_created', (data) => {
             const botUsername = 'CheckerX_Official_Bot';
             const inviteLink = `https://t.me/${botUsername}?start=${data.roomId}`;
+            const prize = Math.floor(data.stake * 1.8);
+            const shareText = `🎮 Play 1vs1 Checkers with me on CheckerX!\n💰 Stake: ${data.stake} X Coins ($${(data.stake/100).toFixed(2)})\n🏆 Winner Gets: ${prize} X Coins ($${(prize/100).toFixed(2)})\n\nJoin match here:`;
             
             document.getElementById('waitingTitle').innerText = "Waiting for Friend...";
-            document.getElementById('waitingDesc').innerHTML = `<b>🔗 Click here to share your link:</b><br><a href="https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('🎮 Play 1vs1 Checkers with me on CheckerX!')}" target="_blank" style="color: #00f2fe; word-break: break-all; font-family: 'Roboto Mono'; font-size: 11px; display:inline-block; margin-top:8px;">${inviteLink}</a><br><br><i>Match starts when your friend joins!</i>`;
+            document.getElementById('waitingDesc').innerHTML = `<b>💰 Room Stake: ${data.stake} X Coins ($${(data.stake/100).toFixed(2)})</b><br><br><b>🔗 Share invite link with your friend:</b><br><a href="https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}" target="_blank" style="color: #00f2fe; word-break: break-all; font-family: 'Roboto Mono'; font-size: 11px; display:inline-block; margin-top:8px;">${inviteLink}</a><br><br><i>Match starts when your friend confirms and joins!</i>`;
         });
 
         socket.on('online_count', (count) => {
@@ -251,9 +308,11 @@
                 const item = document.createElement('div');
                 item.className = 'history-item';
                 const isWin = h.result === 'WIN';
+                const prize = h.prize || Math.floor((h.stake||100)*1.8);
+                const stake = h.stake || 100;
                 item.innerHTML = `
-                    <span>⚔️ vs ${h.opponent}</span>
-                    <span class="${isWin ? 'history-win' : 'history-loss'}">${isWin ? '👑 WIN (+180 X Coins)' : '❌ LOSS (-100 X Coins)'}</span>
+                    <span>⚔️ vs ${h.opponent} (${stake} Coins)</span>
+                    <span class="${isWin ? 'history-win' : 'history-loss'}">${isWin ? `👑 WIN (+${prize} Coins)` : `❌ LOSS (-${stake} Coins)`}</span>
                 `;
                 hList.appendChild(item);
             });
@@ -287,6 +346,9 @@
         socket.on('match_found', (data) => {
             myRole = data.role;
             opponentName = data.opponentName;
+            currentMatchStake = data.stake || 100;
+            currentMatchPrize = Math.floor(currentMatchStake * 1.8);
+            
             currentTurn = 'red';
             timeOutCount = 0;
             isMultiJumping = false;
@@ -325,9 +387,9 @@
             renderBoard();
         });
 
-        socket.on('opponent_disconnected', () => showEndGame(true, "Opponent Disconnected! +180 X Coins ($1.80) 🎉"));
-        socket.on('opponent_timed_out', () => showEndGame(true, "Opponent Missed Turns! +180 X Coins ($1.80) 🎉"));
-        socket.on('you_lost_game', () => showEndGame(false, "Defeat! All your pieces were captured or time expired. ❌"));
+        socket.on('opponent_disconnected', () => showEndGame(true, `Opponent Disconnected! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`));
+        socket.on('opponent_timed_out', () => showEndGame(true, `Opponent Missed Turns! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`));
+        socket.on('you_lost_game', () => showEndGame(false, `Defeat! -${currentMatchStake} X Coins ($${(currentMatchStake/100).toFixed(2)}) ❌`));
 
         function startTurnTimer() {
             clearInterval(timerInterval);
@@ -367,7 +429,7 @@
                 
                 if (timeOutCount >= 2) {
                     socket.emit('timeout_loss');
-                    showEndGame(false, "Match Lost! Missed 2 turns in a row. ❌");
+                    showEndGame(false, `Match Lost! Missed 2 turns in a row (-${currentMatchStake} X Coins). ❌`);
                 } else {
                     banner.innerText = "⚠️ WARNING: You missed your turn! One more miss = Defeat.";
                     banner.style.display = "block";
@@ -383,7 +445,7 @@
         function checkWinCondition() {
             let enemyPieces = 0;
             for(let r=0; r<8; r++) for(let c=0; c<8; c++) if(boardState[r][c] && boardState[r][c].color !== myRole) enemyPieces++;
-            if (enemyPieces === 0) { socket.emit('game_won'); showEndGame(true, "Flawless Victory! +180 X Coins ($1.80) 🎉"); }
+            if (enemyPieces === 0) { socket.emit('game_won'); showEndGame(true, `Flawless Victory! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`); }
         }
 
         function showEndGame(isWin, desc) {

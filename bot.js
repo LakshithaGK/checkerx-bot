@@ -85,10 +85,13 @@ bot.start(async (ctx) => {
         if (!user || !user.country) {
             return ctx.reply("🌍 *Welcome to CheckerX!*\nPlease complete your quick setup first using /start");
         }
+        const roomData = privateRooms[payload];
+        const stakeText = roomData ? `${roomData.stake} X Coins ($${(roomData.stake/100).toFixed(2)})` : "Custom Stake";
+        
         return ctx.replyWithMarkdown(
-            `🎮 *FRIEND INVITE RECEIVED!*\n\nYou have been invited to a private 1vs1 match!\nClick the button below to enter the room and play:`,
+            `🎮 *FRIEND INVITE RECEIVED!*\n\nYou have been invited to a private 1vs1 match!\n💰 *Match Stake:* ${stakeText}\n\nClick below to review and confirm:`,
             Markup.inlineKeyboard([
-                [Markup.button.webApp('⚔️ Join Match Now', `https://checkerx-bot.onrender.com/?room=${payload}`)]
+                [Markup.button.webApp('⚔️ Review & Join Match', `https://checkerx-bot.onrender.com/?room=${payload}`)]
             ])
         );
     }
@@ -221,7 +224,6 @@ bot.hears('📤 Withdrawal', async (ctx) => {
     ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw? (Min 300 X Coins / $3.00)*");
 });
 
-// 🟢 FIX: Added strict TRC20 warnings for crypto withdrawals
 bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     const userId = ctx.from.id;
     const state = userStates[userId];
@@ -606,52 +608,77 @@ io.on('connection', (socket) => {
         } catch (e) {}
     });
 
+    // 🟢 CREATE ROOM WITH STAKE SELECTION
     socket.on('create_room', async (data) => {
         try {
             const user = await getUser(socket.userId, socket.userName);
             if (user.isBanned) return socket.emit('error_message', '❌ You are banned.');
-            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance! You need at least 100 X Coins ($1.00).');
+            
+            const stake = parseInt(data.stake) || 100;
+            const validStakes = [50, 100, 200, 500, 1000];
+            if (!validStakes.includes(stake)) return socket.emit('error_message', 'Invalid stake amount!');
+
+            if (user.balance < stake) return socket.emit('error_message', `Insufficient Balance! You need at least ${stake} X Coins ($${(stake/100).toFixed(2)}).`);
             
             const roomId = `room_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
             socket.join(roomId);
             socket.roomId = roomId;
-            privateRooms[roomId] = socket;
-            socket.emit('room_created', { roomId });
+            privateRooms[roomId] = { socket, stake };
+            socket.emit('room_created', { roomId, stake });
         } catch (e) {}
+    });
+
+    // 🟢 GET ROOM STAKE INFO FOR CONFIRMATION MODAL
+    socket.on('get_room_info', (data) => {
+        const roomData = privateRooms[data.roomId];
+        if (roomData) {
+            socket.emit('room_info_res', {
+                exists: true,
+                roomId: data.roomId,
+                stake: roomData.stake,
+                creatorName: roomData.socket.userName || 'Friend'
+            });
+        } else {
+            socket.emit('room_info_res', { exists: false });
+        }
     });
 
     socket.on('join_room', async (data) => {
         try {
-            const creatorSocket = privateRooms[data.roomId];
-            if (!creatorSocket) return socket.emit('error_message', 'Room expired or already started!');
+            const roomData = privateRooms[data.roomId];
+            if (!roomData) return socket.emit('error_message', 'Room expired or already started!');
+            
+            const creatorSocket = roomData.socket;
+            const roomStake = roomData.stake;
+
             if (creatorSocket.id === socket.id) return;
 
             const u1 = await User.findOne({ id: creatorSocket.userId });
             const u2 = await User.findOne({ id: socket.userId });
 
-            if (!u1 || u1.balance < 100) {
+            if (!u1 || u1.balance < roomStake) {
                 creatorSocket.emit('error_message', 'Insufficient Balance to start match!');
                 socket.emit('error_message', 'Friend has insufficient balance.');
                 return;
             }
-            if (!u2 || u2.balance < 100) {
-                return socket.emit('error_message', 'Insufficient Balance! You need at least 100 X Coins ($1.00).');
+            if (!u2 || u2.balance < roomStake) {
+                return socket.emit('error_message', `Insufficient Balance! You need at least ${roomStake} X Coins ($${(roomStake/100).toFixed(2)}).`);
             }
 
             socket.join(data.roomId);
             socket.roomId = data.roomId;
             delete privateRooms[data.roomId];
 
-            activeRooms[data.roomId] = { p1: creatorSocket, p2: socket, turn: 'red' };
+            activeRooms[data.roomId] = { p1: creatorSocket, p2: socket, turn: 'red', stake: roomStake };
 
-            u1.balance -= 100; await u1.save(); 
+            u1.balance -= roomStake; await u1.save(); 
             creatorSocket.emit('user_synced', { balance: u1.balance, name: u1.name, winRate: Math.round((u1.wins/(u1.wins+u1.losses||1))*100), history: u1.history });
             
-            u2.balance -= 100; await u2.save(); 
+            u2.balance -= roomStake; await u2.save(); 
             socket.emit('user_synced', { balance: u2.balance, name: u2.name, winRate: Math.round((u2.wins/(u2.wins+u2.losses||1))*100), history: u2.history });
 
-            creatorSocket.emit('match_found', { role: 'red', opponentName: socket.userName, roomId: data.roomId });
-            socket.emit('match_found', { role: 'black', opponentName: creatorSocket.userName, roomId: data.roomId });
+            creatorSocket.emit('match_found', { role: 'red', opponentName: socket.userName, roomId: data.roomId, stake: roomStake });
+            socket.emit('match_found', { role: 'black', opponentName: creatorSocket.userName, roomId: data.roomId, stake: roomStake });
         } catch (e) {}
     });
 
@@ -676,7 +703,7 @@ io.on('connection', (socket) => {
                 const roomId = `room_${socket.id}_${opponent.id}`;
                 socket.join(roomId); opponent.join(roomId);
                 socket.roomId = roomId; opponent.roomId = roomId;
-                activeRooms[roomId] = { p1: socket, p2: opponent, turn: 'red' };
+                activeRooms[roomId] = { p1: socket, p2: opponent, turn: 'red', stake: 100 };
 
                 u1.balance -= 100; await u1.save(); 
                 u1.winRate = Math.round((u1.wins/(u1.wins+u1.losses||1))*100); 
@@ -686,8 +713,8 @@ io.on('connection', (socket) => {
                 u2.winRate = Math.round((u2.wins/(u2.wins+u2.losses||1))*100); 
                 opponent.emit('user_synced', { balance: u2.balance, name: u2.name, winRate: u2.winRate, history: u2.history });
 
-                socket.emit('match_found', { role: 'red', opponentName: opponent.userName, roomId });
-                opponent.emit('match_found', { role: 'black', opponentName: socket.userName, roomId });
+                socket.emit('match_found', { role: 'red', opponentName: opponent.userName, roomId, stake: 100 });
+                opponent.emit('match_found', { role: 'black', opponentName: socket.userName, roomId, stake: 100 });
             } else {
                 if (!waitingPlayers.find(p => p.id === socket.id)) waitingPlayers.push(socket);
             }
@@ -708,14 +735,19 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 🟢 DYNAMIC WIN CALCULATION BASED ON MATCH STAKE
     async function handleWin(winnerSocket, loserSocket, eventName, reason = "Normal Win") {
         if (!winnerSocket || !winnerSocket.userId) return;
         try {
+            const room = activeRooms[winnerSocket.roomId];
+            const matchStake = room ? (room.stake || 100) : 100;
+            const prizeCoins = Math.floor(matchStake * 1.8);
+
             const winner = await User.findOne({ id: winnerSocket.userId });
             if (winner) {
-                winner.balance += 180;
+                winner.balance += prizeCoins;
                 winner.wins += 1;
-                winner.history.unshift({ result: 'WIN', opponent: loserSocket && loserSocket.userName ? loserSocket.userName : 'Opponent', time: Date.now() });
+                winner.history.unshift({ result: 'WIN', opponent: loserSocket && loserSocket.userName ? loserSocket.userName : 'Opponent', time: Date.now(), stake: matchStake, prize: prizeCoins });
                 if (winner.history.length > 20) winner.history.pop();
                 await winner.save();
                 const wr = Math.round((winner.wins / (winner.wins + winner.losses || 1)) * 100);
@@ -728,7 +760,7 @@ io.on('connection', (socket) => {
                     const loser = await User.findOne({ id: loserSocket.userId });
                     if (loser) {
                         loser.losses += 1;
-                        loser.history.unshift({ result: 'LOSS', opponent: winner ? winner.name : 'Opponent', time: Date.now() });
+                        loser.history.unshift({ result: 'LOSS', opponent: winner ? winner.name : 'Opponent', time: Date.now(), stake: matchStake });
                         if (loser.history.length > 20) loser.history.pop();
                         await loser.save();
                         const wr = Math.round((loser.wins / (loser.wins + loser.losses || 1)) * 100);
@@ -739,7 +771,7 @@ io.on('connection', (socket) => {
 
             if (loserSocket && loserSocket.userId && winner) {
                 const loserUser = await User.findOne({ id: loserSocket.userId });
-                const logMsg = `🏆 *Match Finished*\n\n🟢 *Winner:* ${winner.name} (\`${winner.id}\`)\n🔴 *Loser:* ${loserUser ? loserUser.name : 'Player'} (\`${loserSocket.userId}\`)\nℹ️ *Reason:* ${reason}`;
+                const logMsg = `🏆 *Match Finished*\n\n🟢 *Winner:* ${winner.name} (\`${winner.id}\`)\n🔴 *Loser:* ${loserUser ? loserUser.name : 'Player'} (\`${loserSocket.userId}\`)\n💰 *Stake:* ${matchStake} Coins\nℹ️ *Reason:* ${reason}`;
                 bot.telegram.sendMessage(MATCH_LOG_CHANNEL_ID, logMsg, { parse_mode: 'Markdown' }).catch(e => {});
             }
         } catch (e) { }
@@ -770,7 +802,7 @@ io.on('connection', (socket) => {
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) waitingPlayers.splice(index, 1);
         for (const [rid, s] of Object.entries(privateRooms)) {
-            if (s.id === socket.id) delete privateRooms[rid];
+            if (s.socket.id === socket.id) delete privateRooms[rid];
         }
     });
 
@@ -783,7 +815,7 @@ io.on('connection', (socket) => {
         if (index !== -1) waitingPlayers.splice(index, 1);
 
         for (const [rid, s] of Object.entries(privateRooms)) {
-            if (s.id === socket.id) delete privateRooms[rid];
+            if (s.socket.id === socket.id) delete privateRooms[rid];
         }
 
         if (socket.roomId && activeRooms[socket.roomId]) {
