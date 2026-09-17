@@ -199,13 +199,11 @@ bot.hears('📥 Deposit', async (ctx) => {
     });
 });
 
-// 🟢 FIX 1: Strict Regex ^dep_(.+)$ so it doesn't trigger on "approve_dep_..."
 bot.action(/^dep_([a-zA-Z_]+)$/, async (ctx) => {
     const method = ctx.match[1].toUpperCase();
     const userId = ctx.from.id;
     let address = '';
     
-    // 🟢 Dynamic Deposit Instructions
     if (method === 'BINANCE') {
         address = 'Binance Pay ID: `123456789`'; 
     } else if (method === 'USDT' || method === 'TRX') {
@@ -223,12 +221,18 @@ bot.hears('📤 Withdrawal', async (ctx) => {
     const userId = ctx.from.id;
     const user = await User.findOne({ id: String(userId) });
     if (user && user.isBanned) return;
+    
+    // 🟢 NEW FIX: Anti-Bonus Abuse (Must play at least 1 match)
+    if ((user.wins + user.losses) === 0) {
+        return ctx.replyWithMarkdown(`❌ *Withdrawal Denied!*\n\nYou must play at least **1 Match** before making a withdrawal.\n\n🎮 Click 'Play CheckerX' to join a match!`);
+    }
+
     if (user.balance < 300) return ctx.replyWithMarkdown(`❌ *Insufficient Balance!* You need at least 300 X Coins ($3.00) to withdraw.\nYour Balance: ${user.balance}`);
+    
     userStates[userId] = { action: 'withdraw', step: 'awaiting_amount' };
     ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw? (Min 300)*");
 });
 
-// 🟢 FIX 2: Strict Regex ^with_(.+)$
 bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     const userId = ctx.from.id;
     const state = userStates[userId];
@@ -237,7 +241,6 @@ bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     state.step = 'awaiting_address';
     await ctx.answerCbQuery();
     
-    // 🟢 Dynamic Withdrawal Instructions
     let promptMsg = state.method === 'BINANCE' 
         ? '📍 *Paste your Binance Pay ID or Binance Email below:*' 
         : '📍 *Paste your Wallet Address (TRC20 / SOL) below:*';
@@ -381,36 +384,6 @@ bot.action(/^reject_wit_(\d+)_([\d.]+)$/, async (ctx) => {
     }
 });
 
-bot.command('addbalance', async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_ID) return;
-    const args = ctx.message.text.split(' ');
-    if (args.length < 3) return ctx.reply("⚠️ Usage: /addbalance <user_id> <amount>");
-    let targetId = args[1]; 
-    let amount = parseFloat(args[2]);
-    if (isNaN(amount) || amount <= 0) return ctx.reply("❌ Invalid amount.");
-    try {
-        let user = await User.findOne({ id: targetId });
-        if (!user) return ctx.reply("❌ User not found!");
-        user.balance += amount; await user.save();
-        ctx.reply(`✅ Added ${amount} X Coins to \`${targetId}\`.`);
-    } catch (e) { ctx.reply("❌ Error."); }
-});
-
-bot.command('removebalance', async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_ID) return;
-    const args = ctx.message.text.split(' ');
-    if (args.length < 3) return ctx.reply("⚠️ Usage: /removebalance <user_id> <amount>");
-    let targetId = args[1]; 
-    let amount = parseFloat(args[2]);
-    if (isNaN(amount) || amount <= 0) return ctx.reply("❌ Invalid amount.");
-    try {
-        let user = await User.findOne({ id: targetId });
-        if (!user) return ctx.reply("❌ User not found!");
-        user.balance = Math.max(0, user.balance - amount); await user.save();
-        ctx.reply(`✅ Removed ${amount} X Coins from \`${targetId}\`.`);
-    } catch (e) { ctx.reply("❌ Error."); }
-});
-
 bot.command('ban', async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
@@ -535,7 +508,6 @@ bot.on('text', async (ctx, next) => {
         state.amount = amount; 
         state.step = 'awaiting_txid';
         
-        // 🟢 Dynamic ID Request
         let idType = state.method === 'BINANCE' ? '*Binance Pay ID / Email*' : '*TxID (Transaction Hash)*';
         return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}*\n\n🔗 Paste your ${idType} below:`);
     }
