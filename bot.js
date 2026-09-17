@@ -20,7 +20,6 @@ mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ Successfully connected to MongoDB Atlas!"))
     .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
-// 🟢 Database Schema (isBanned added)
 const userSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
     name: { type: String, default: 'Player' },
@@ -78,7 +77,6 @@ bot.start(async (ctx) => {
 
     let user = await getUser(userId, ctx.from.first_name, referrerId);
     
-    // 🛑 Check if user is Banned
     if (user.isBanned) return ctx.reply("❌ Your account has been banned from CheckerX.");
     
     delete userStates[userId]; 
@@ -209,16 +207,16 @@ bot.action(/dep_(.+)/, async (ctx) => {
     if(method === 'BINANCE') address = 'Pay ID: 123456789'; 
     userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount' };
     await ctx.answerCbQuery();
-    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend payment to:\n\`${address}\`\n\n👇 *How much are you depositing? (in USD)*`);
+    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend payment to:\n\`${address}\`\n\n👇 *How much are you depositing? (Min $2.00)*`);
 });
 
 bot.hears('📤 Withdrawal', async (ctx) => {
     const userId = ctx.from.id;
     const user = await User.findOne({ id: String(userId) });
     if (user && user.isBanned) return;
-    if (user.balance < 300) return ctx.replyWithMarkdown(`❌ *Insufficient Balance* (Min: 300 X Coins)`);
+    if (user.balance < 300) return ctx.replyWithMarkdown(`❌ *Insufficient Balance!* You need at least 300 X Coins ($3.00) to withdraw.\nYour Balance: ${user.balance}`);
     userStates[userId] = { action: 'withdraw', step: 'awaiting_amount' };
-    ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw?*");
+    ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw? (Min 300)*");
 });
 
 bot.action(/with_(.+)/, async (ctx) => {
@@ -242,13 +240,17 @@ bot.command('addbalance', async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
     if (args.length < 3) return ctx.reply("⚠️ Usage: /addbalance <user_id> <amount>");
-    let targetId = args[1]; let amount = parseFloat(args[2]);
+    
+    let targetId = args[1]; 
+    let amount = parseFloat(args[2]);
+    if (isNaN(amount) || amount <= 0) return ctx.reply("❌ Invalid amount. Must be a positive number.");
+
     try {
         let user = await User.findOne({ id: targetId });
         if (!user) return ctx.reply("❌ User not found!");
         user.balance += amount; await user.save();
         ctx.reply(`✅ Added ${amount} X Coins to \`${targetId}\`.\nNew Balance: ${user.balance}`, { parse_mode: 'Markdown' });
-        bot.telegram.sendMessage(targetId, `✅ *Deposit Successful:* You received *${amount} X Coins*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
+        bot.telegram.sendMessage(targetId, `🎁 *Admin Reward:* You received *${amount} X Coins*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
     } catch (e) { ctx.reply("❌ Error processing command."); }
 });
 
@@ -256,7 +258,11 @@ bot.command('removebalance', async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
     if (args.length < 3) return ctx.reply("⚠️ Usage: /removebalance <user_id> <amount>");
-    let targetId = args[1]; let amount = parseFloat(args[2]);
+    
+    let targetId = args[1]; 
+    let amount = parseFloat(args[2]);
+    if (isNaN(amount) || amount <= 0) return ctx.reply("❌ Invalid amount. Must be a positive number.");
+
     try {
         let user = await User.findOne({ id: targetId });
         if (!user) return ctx.reply("❌ User not found!");
@@ -316,7 +322,9 @@ bot.command('stats', async (ctx) => {
 });
 
 
-// 🟢 Text Handler (Setup & Deposits)
+// ==========================================
+// 🟢 SECURE TEXT HANDLER (Deposits & Withdrawals)
+// ==========================================
 bot.on('text', async (ctx, next) => {
     const userId = ctx.from.id;
     const text = ctx.message.text;
@@ -340,10 +348,17 @@ bot.on('text', async (ctx, next) => {
     }
     if (!state) return next();
 
+    // 🛡️ Secure Deposit Input Verification
     if (state.action === 'deposit' && state.step === 'awaiting_amount') {
-        state.amount = parseFloat(text); state.step = 'awaiting_txid';
+        const amount = parseFloat(text);
+        if (isNaN(amount) || amount < 2.0) {
+            return ctx.reply("⚠️ *Error:* Minimum deposit is $2.00. Please enter a valid number (e.g., 2, 5, 10):", { parse_mode: 'Markdown' });
+        }
+        state.amount = amount; 
+        state.step = 'awaiting_txid';
         return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}*\n\n🔗 Paste your *TxID* below:`);
     }
+
     if (state.action === 'deposit' && state.step === 'awaiting_txid') {
         if (!user.firstDepositDone && state.amount >= 2.0) {
             user.firstDepositDone = true;
@@ -366,15 +381,33 @@ bot.on('text', async (ctx, next) => {
         delete userStates[userId]; 
         return;
     }
+
+    // 🛡️ Secure Withdrawal Input Verification
     if (state.action === 'withdraw' && state.step === 'awaiting_amount') {
-        state.amount = parseFloat(text); state.step = 'awaiting_method';
+        const amount = parseFloat(text);
+        if (isNaN(amount) || amount < 300) {
+            return ctx.reply("⚠️ *Error:* Minimum withdrawal is 300 X Coins ($3.00). Please enter a valid number:", { parse_mode: 'Markdown' });
+        }
+        if (amount > user.balance) {
+            return ctx.reply(`❌ *Insufficient Balance!* You only have ${user.balance} X Coins.`, { parse_mode: 'Markdown' });
+        }
+        state.amount = amount; 
+        state.step = 'awaiting_method';
         return ctx.reply("💳 Select withdrawal method:", Markup.inlineKeyboard([
             [Markup.button.callback('🔶 Binance', 'with_binance'), Markup.button.callback('💵 USDT', 'with_usdt')],
             [Markup.button.callback('🔴 TRX', 'with_trx'), Markup.button.callback('🟣 Solana', 'with_sol')]
         ]));
     }
+
     if (state.action === 'withdraw' && state.step === 'awaiting_address') {
-        user.balance -= state.amount; await user.save();
+        // 🛡️ Double Check Balance before processing to prevent race conditions
+        if (user.balance < state.amount) {
+            delete userStates[userId];
+            return ctx.reply("❌ *Error:* Balance changed. Withdrawal cancelled.", { parse_mode: 'Markdown' });
+        }
+        user.balance -= state.amount; 
+        await user.save();
+        
         const adminMsg = `📤 *NEW WITHDRAWAL* 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* ${state.amount} Coins\n📍 *Addr:* \`${text}\``;
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
             parse_mode: 'Markdown',
@@ -387,11 +420,11 @@ bot.on('text', async (ctx, next) => {
     return next();
 });
 
-bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.error("Bot Error:", err.message));
+bot.launch().then(() => console.log("Bot launched! (Secure Edition)")).catch((err) => console.error("Bot Error:", err.message));
 
 
 // ==========================================
-// --- MULTIPLAYER & LIVE PLAYERS ENGINE ---
+// 🛡️ MULTIPLAYER & LIVE PLAYERS ENGINE (SECURE)
 // ==========================================
 const waitingPlayers = [];
 const privateRooms = {}; 
@@ -429,7 +462,7 @@ io.on('connection', (socket) => {
         try {
             const user = await getUser(socket.userId, socket.userName);
             if (user.isBanned) return socket.emit('error_message', '❌ You are banned.');
-            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
+            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance! You need at least 100 Coins.');
             
             const roomId = `room_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
             socket.join(roomId);
@@ -441,13 +474,22 @@ io.on('connection', (socket) => {
 
     socket.on('join_room', async (data) => {
         try {
-            const user = await getUser(socket.userId, socket.userName);
-            if (user.isBanned) return socket.emit('error_message', '❌ You are banned.');
-            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
-            
             const creatorSocket = privateRooms[data.roomId];
-            if (!creatorSocket) return socket.emit('error_message', 'Room expired!');
+            if (!creatorSocket) return socket.emit('error_message', 'Room expired or already started!');
             if (creatorSocket.id === socket.id) return;
+
+            // 🛡️ Double Check Balances
+            const u1 = await User.findOne({ id: creatorSocket.userId });
+            const u2 = await User.findOne({ id: socket.userId });
+
+            if (!u1 || u1.balance < 100) {
+                creatorSocket.emit('error_message', 'Insufficient Balance to start match!');
+                socket.emit('error_message', 'Friend has insufficient balance.');
+                return;
+            }
+            if (!u2 || u2.balance < 100) {
+                return socket.emit('error_message', 'Insufficient Balance! You need at least 100 Coins.');
+            }
 
             socket.join(data.roomId);
             socket.roomId = data.roomId;
@@ -455,11 +497,11 @@ io.on('connection', (socket) => {
 
             activeRooms[data.roomId] = { p1: creatorSocket, p2: socket, turn: 'red' };
 
-            const u1 = await User.findOne({ id: creatorSocket.userId });
-            const u2 = await User.findOne({ id: socket.userId });
-
-            if (u1) { u1.balance -= 100; await u1.save(); creatorSocket.emit('user_synced', { balance: u1.balance, name: u1.name, winRate: Math.round((u1.wins/(u1.wins+u1.losses||1))*100), history: u1.history }); }
-            if (u2) { u2.balance -= 100; await u2.save(); socket.emit('user_synced', { balance: u2.balance, name: u2.name, winRate: Math.round((u2.wins/(u2.wins+u2.losses||1))*100), history: u2.history }); }
+            u1.balance -= 100; await u1.save(); 
+            creatorSocket.emit('user_synced', { balance: u1.balance, name: u1.name, winRate: Math.round((u1.wins/(u1.wins+u1.losses||1))*100), history: u1.history });
+            
+            u2.balance -= 100; await u2.save(); 
+            socket.emit('user_synced', { balance: u2.balance, name: u2.name, winRate: Math.round((u2.wins/(u2.wins+u2.losses||1))*100), history: u2.history });
 
             creatorSocket.emit('match_found', { role: 'red', opponentName: socket.userName, roomId: data.roomId });
             socket.emit('match_found', { role: 'black', opponentName: creatorSocket.userName, roomId: data.roomId });
@@ -468,23 +510,35 @@ io.on('connection', (socket) => {
 
     socket.on('find_match', async (data) => {
         try {
-            const user = await getUser(socket.userId, socket.userName);
-            if (user.isBanned) return socket.emit('error_message', '❌ You are banned from playing.');
-            if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
+            const uCurrent = await User.findOne({ id: socket.userId });
+            if (!uCurrent || uCurrent.isBanned) return socket.emit('error_message', '❌ You are banned from playing.');
+            if (uCurrent.balance < 100) return socket.emit('error_message', 'Insufficient Balance! You need at least 100 Coins.');
 
             if (waitingPlayers.length > 0 && waitingPlayers[0].id !== socket.id) {
                 const opponent = waitingPlayers.shift();
-                const roomId = `room_${socket.id}_${opponent.id}`;
+                
+                // 🛡️ Double Check Before Deducting
+                const u1 = await User.findOne({ id: socket.userId });
+                const u2 = await User.findOne({ id: opponent.userId });
 
+                if (u1.balance < 100 || u2.balance < 100) {
+                    if (u1.balance < 100) socket.emit('error_message', 'Balance dropped below 100!');
+                    if (u2.balance < 100) opponent.emit('error_message', 'Balance dropped below 100!');
+                    return;
+                }
+
+                const roomId = `room_${socket.id}_${opponent.id}`;
                 socket.join(roomId); opponent.join(roomId);
                 socket.roomId = roomId; opponent.roomId = roomId;
                 activeRooms[roomId] = { p1: socket, p2: opponent, turn: 'red' };
 
-                const u1 = await User.findOne({ id: socket.userId });
-                const u2 = await User.findOne({ id: opponent.userId });
+                u1.balance -= 100; await u1.save(); 
+                u1.winRate = Math.round((u1.wins/(u1.wins+u1.losses||1))*100); 
+                socket.emit('user_synced', { balance: u1.balance, name: u1.name, winRate: u1.winRate, history: u1.history });
                 
-                if (u1) { u1.balance -= 100; await u1.save(); u1.winRate = Math.round((u1.wins/(u1.wins+u1.losses||1))*100); socket.emit('user_synced', { balance: u1.balance, name: u1.name, winRate: u1.winRate, history: u1.history }); }
-                if (u2) { u2.balance -= 100; await u2.save(); u2.winRate = Math.round((u2.wins/(u2.wins+u2.losses||1))*100); opponent.emit('user_synced', { balance: u2.balance, name: u2.name, winRate: u2.winRate, history: u2.history }); }
+                u2.balance -= 100; await u2.save(); 
+                u2.winRate = Math.round((u2.wins/(u2.wins+u2.losses||1))*100); 
+                opponent.emit('user_synced', { balance: u2.balance, name: u2.name, winRate: u2.winRate, history: u2.history });
 
                 socket.emit('match_found', { role: 'red', opponentName: opponent.userName, roomId });
                 opponent.emit('match_found', { role: 'black', opponentName: socket.userName, roomId });
@@ -578,8 +632,7 @@ io.on('connection', (socket) => {
         onlineUsersCount--;
         io.emit('online_count', onlineUsersCount); 
         delete activeSockets[socket.id];
-        // broadcastOnlineUsers();
-
+        
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) waitingPlayers.splice(index, 1);
 
