@@ -248,7 +248,7 @@ bot.command('addbalance', async (ctx) => {
         if (!user) return ctx.reply("❌ User not found!");
         user.balance += amount; await user.save();
         ctx.reply(`✅ Added ${amount} X Coins to \`${targetId}\`.\nNew Balance: ${user.balance}`, { parse_mode: 'Markdown' });
-        bot.telegram.sendMessage(targetId, `🎁 *Admin Reward:* You received *${amount} X Coins*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
+        bot.telegram.sendMessage(targetId, `✅ *Deposit Successful:* You received *${amount} X Coins*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
     } catch (e) { ctx.reply("❌ Error processing command."); }
 });
 
