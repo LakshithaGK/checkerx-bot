@@ -199,14 +199,24 @@ bot.hears('📥 Deposit', async (ctx) => {
     });
 });
 
-bot.action(/dep_(.+)/, async (ctx) => {
+// 🟢 FIX 1: Strict Regex ^dep_(.+)$ so it doesn't trigger on "approve_dep_..."
+bot.action(/^dep_([a-zA-Z_]+)$/, async (ctx) => {
     const method = ctx.match[1].toUpperCase();
     const userId = ctx.from.id;
-    let address = 'Your_Wallet_Address_Here';
-    if(method === 'BINANCE') address = 'Pay ID: 123456789'; 
+    let address = '';
+    
+    // 🟢 Dynamic Deposit Instructions
+    if (method === 'BINANCE') {
+        address = 'Binance Pay ID: `123456789`'; 
+    } else if (method === 'USDT' || method === 'TRX') {
+        address = 'TRC20 Wallet Address:\n`Your_TRC20_Wallet_Address_Here`';
+    } else if (method === 'SOL') {
+        address = 'Solana Wallet Address:\n`Your_SOL_Wallet_Address_Here`';
+    }
+
     userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount' };
     await ctx.answerCbQuery();
-    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend payment to:\n\`${address}\`\n\n👇 *How much are you depositing? (Min $2.00)*`);
+    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend payment to:\n${address}\n\n👇 *How much are you depositing? (Min $2.00)*`);
 });
 
 bot.hears('📤 Withdrawal', async (ctx) => {
@@ -218,17 +228,23 @@ bot.hears('📤 Withdrawal', async (ctx) => {
     ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw? (Min 300)*");
 });
 
-bot.action(/with_(.+)/, async (ctx) => {
+// 🟢 FIX 2: Strict Regex ^with_(.+)$
+bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     const userId = ctx.from.id;
     const state = userStates[userId];
     if (!state) return;
     state.method = ctx.match[1].toUpperCase();
     state.step = 'awaiting_address';
     await ctx.answerCbQuery();
-    ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n📍 *Paste your Wallet Address below:*`);
+    
+    // 🟢 Dynamic Withdrawal Instructions
+    let promptMsg = state.method === 'BINANCE' 
+        ? '📍 *Paste your Binance Pay ID or Binance Email below:*' 
+        : '📍 *Paste your Wallet Address (TRC20 / SOL) below:*';
+        
+    ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n${promptMsg}`);
 });
 
-// 🟢 Updated Admin Contact Link
 bot.hears('💬 Support', (ctx) => ctx.reply("💬 *Customer Support*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/CheckerX_Admin')]]) }));
 
 
@@ -236,7 +252,6 @@ bot.hears('💬 Support', (ctx) => ctx.reply("💬 *Customer Support*", { parse_
 // 🛡️ ADMIN PANEL & BUTTON HANDLERS (SECURE)
 // ==========================================
 
-// 1. Interactive Admin Menu Command
 bot.command('admin', (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     ctx.reply("👑 *ADMIN CONTROL PANEL*", {
@@ -250,7 +265,6 @@ bot.command('admin', (ctx) => {
     });
 });
 
-// Admin Callbacks for the Menu
 bot.action('admin_add_bal', (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     userStates[ADMIN_ID] = { action: 'admin_add1' };
@@ -277,7 +291,6 @@ bot.action('admin_stats', async (ctx) => {
     } catch(e) {}
 });
 
-// Top Referrals Logic
 bot.action('admin_top_refs', async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     ctx.answerCbQuery();
@@ -303,7 +316,6 @@ bot.action('admin_top_refs', async (ctx) => {
     } catch (e) { ctx.reply("Error fetching top referrers."); }
 });
 
-// 2. Deposit Approval / Rejection Buttons Logic
 bot.action(/^approve_dep_(\d+)_([\d.]+)$/, async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID && String(ctx.chat.id) !== ADMIN_GROUP_ID) return ctx.answerCbQuery("❌ Admin only!");
     const targetId = ctx.match[1];
@@ -316,13 +328,12 @@ bot.action(/^approve_dep_(\d+)_([\d.]+)$/, async (ctx) => {
         
         user.balance += coinsToAdd;
         
-        // 🟢 Referral Logic Triggered ONLY upon approval!
         if (!user.firstDepositDone && amountUSD >= 2.0) {
             user.firstDepositDone = true;
             if (user.referredBy) {
                 let referrer = await User.findOne({ id: user.referredBy });
                 if (referrer) {
-                    referrer.balance += 10; // 10 Coins = $0.10
+                    referrer.balance += 10; 
                     await referrer.save();
                     bot.telegram.sendMessage(referrer.id, `🎉 *Referral Bonus!* Your invited friend made their first deposit. You earned *10 X Coins ($0.10)*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
                 }
@@ -344,7 +355,6 @@ bot.action(/^reject_dep_(\d+)$/, async (ctx) => {
     bot.telegram.sendMessage(targetId, `❌ *Deposit Rejected!*\nYour recent deposit request was declined by the admin. Please verify your TxID or contact support.`, { parse_mode: 'Markdown' }).catch(e=>{});
 });
 
-// 3. Withdrawal Approval / Rejection Buttons Logic
 bot.action(/^approve_wit_(\d+)_([\d.]+)$/, async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID && String(ctx.chat.id) !== ADMIN_GROUP_ID) return ctx.answerCbQuery("❌ Admin only!");
     const targetId = ctx.match[1];
@@ -361,7 +371,7 @@ bot.action(/^reject_wit_(\d+)_([\d.]+)$/, async (ctx) => {
     try {
         let user = await User.findOne({ id: targetId });
         if (user) {
-            user.balance += amount; // Refund the deducted balance
+            user.balance += amount; 
             await user.save();
         }
         ctx.editMessageText(`❌ *WITHDRAWAL REJECTED*\n\n👤 User ID: \`${targetId}\`\n💸 Amount: ${amount} Coins\n\n🚫 Coins refunded to user.`, { parse_mode: 'Markdown' });
@@ -371,7 +381,6 @@ bot.action(/^reject_wit_(\d+)_([\d.]+)$/, async (ctx) => {
     }
 });
 
-// Classic Commands (Fallback)
 bot.command('addbalance', async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
@@ -452,7 +461,6 @@ bot.on('text', async (ctx, next) => {
     let user = await User.findOne({ id: String(userId) });
     if (user && user.isBanned) return; 
 
-    // 🛡️ Admin Panel Manual Input Handling
     if (state && state.action === 'admin_add1') {
         state.targetId = text.trim();
         state.action = 'admin_add2';
@@ -526,12 +534,13 @@ bot.on('text', async (ctx, next) => {
         }
         state.amount = amount; 
         state.step = 'awaiting_txid';
-        return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}*\n\n🔗 Paste your *TxID* below:`);
+        
+        // 🟢 Dynamic ID Request
+        let idType = state.method === 'BINANCE' ? '*Binance Pay ID / Email*' : '*TxID (Transaction Hash)*';
+        return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}*\n\n🔗 Paste your ${idType} below:`);
     }
 
     if (state.action === 'deposit' && state.step === 'awaiting_txid') {
-        // Referral auto-add logic removed from here and moved to "Approve Button" above!
-        
         const adminMsg = `📥 *NEW DEPOSIT* 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount}\n🔗 *TxID:* \`${text}\``;
         
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
@@ -545,7 +554,7 @@ bot.on('text', async (ctx, next) => {
             }
         }).catch(e=>{});
         
-        ctx.replyWithMarkdown("✅ *Deposit Submitted Successfully!* Admins will verify your TxID.");
+        ctx.replyWithMarkdown("✅ *Deposit Submitted Successfully!* Admins will verify your transaction.");
         delete userStates[userId]; 
         return;
     }
