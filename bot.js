@@ -173,6 +173,7 @@ bot.hears('💰 Balance', async (ctx) => {
     ctx.replyWithMarkdown(balanceMsg);
 });
 
+// 🟢 Updated Deposit Methods (Low Fee Coins + Binance, No Solana)
 bot.hears('📥 Deposit', async (ctx) => {
     const user = await User.findOne({ id: String(ctx.from.id) });
     if (user && user.isBanned) return;
@@ -181,7 +182,7 @@ bot.hears('📥 Deposit', async (ctx) => {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.callback('🔶 Binance Pay', 'dep_binance'), Markup.button.callback('💵 USDT (TRC20)', 'dep_usdt')],
-            [Markup.button.callback('🔴 TRX (TRC20)', 'dep_trx'), Markup.button.callback('🟣 Solana', 'dep_sol')]
+            [Markup.button.callback('🔴 TRX (TRC20)', 'dep_trx'), Markup.button.callback('💎 TON', 'dep_ton')]
         ])
     });
 });
@@ -195,8 +196,8 @@ bot.action(/^dep_([a-zA-Z_]+)$/, async (ctx) => {
         address = 'Binance Pay ID: `123456789`'; 
     } else if (method === 'USDT' || method === 'TRX') {
         address = 'TRC20 Wallet Address:\n`Your_TRC20_Wallet_Address_Here`';
-    } else if (method === 'SOL') {
-        address = 'Solana Wallet Address:\n`Your_SOL_Wallet_Address_Here`';
+    } else if (method === 'TON') {
+        address = 'TON Wallet Address:\n`Your_TON_Wallet_Address_Here`';
     }
 
     userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount' };
@@ -219,6 +220,7 @@ bot.hears('📤 Withdrawal', async (ctx) => {
     ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw? (Min 300)*");
 });
 
+// 🟢 Updated Withdrawal Methods (No Solana, Added low fee options)
 bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     const userId = ctx.from.id;
     const state = userStates[userId];
@@ -229,7 +231,7 @@ bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     
     let promptMsg = state.method === 'BINANCE' 
         ? '📍 *Paste your Binance Pay ID or Binance Email below:*' 
-        : '📍 *Paste your Wallet Address (TRC20 / SOL) below:*';
+        : `📍 *Paste your ${state.method} Address below:*`;
         
     ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n${promptMsg}`);
 });
@@ -500,7 +502,7 @@ bot.on('text', async (ctx, next) => {
     }
 
     if (state.action === 'deposit' && state.step === 'awaiting_txid') {
-        const adminMsg = `📥 *NEW DEPOSIT* 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount}\n🔗 *TxID:* \`${text}\``;
+        const adminMsg = `📥 *NEW DEPOSIT* (${state.method}) 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount}\n🔗 *TxID:* \`${text}\``;
         
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
             parse_mode: 'Markdown',
@@ -528,9 +530,11 @@ bot.on('text', async (ctx, next) => {
         }
         state.amount = amount; 
         state.step = 'awaiting_method';
+        
+        // 🟢 Updated Withdrawal Method Selection (No Solana, Low Fee Coins)
         return ctx.reply("💳 Select withdrawal method:", Markup.inlineKeyboard([
             [Markup.button.callback('🔶 Binance', 'with_binance'), Markup.button.callback('💵 USDT', 'with_usdt')],
-            [Markup.button.callback('🔴 TRX', 'with_trx'), Markup.button.callback('🟣 Solana', 'with_sol')]
+            [Markup.button.callback('🔴 TRX', 'with_trx'), Markup.button.callback('💎 TON', 'with_ton')]
         ]));
     }
 
@@ -542,8 +546,8 @@ bot.on('text', async (ctx, next) => {
         user.balance -= state.amount; 
         await user.save();
         
-        // 🟢 NEW: Added User's Available Balance to the Admin Withdrawal Message
-        const adminMsg = `📤 *NEW WITHDRAWAL* 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💰 *Avail. Bal:* \`${user.balance} Coins\`\n💸 *Req. Amt:* ${state.amount} Coins\n📍 *Addr:* \`${text}\``;
+        // 🟢 FIX: Added Payment Method to the Admin Withdrawal Notification
+        const adminMsg = `📤 *NEW WITHDRAWAL* (${state.method}) 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💰 *Avail. Bal:* \`${user.balance} Coins\`\n💸 *Req. Amt:* ${state.amount} Coins\n📍 *Addr:* \`${text}\``;
         
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
             parse_mode: 'Markdown',
