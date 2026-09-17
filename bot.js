@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
     name: { type: String, default: 'Player' },
     balance: { type: Number, default: 20 }, 
     country: { type: String, default: null },
-    language: { type: String, default: null },
+    language: { type: String, default: 'en' }, 
     referredBy: { type: String, default: null },
     firstDepositDone: { type: Boolean, default: false },
     isBanned: { type: Boolean, default: false },
@@ -82,7 +82,7 @@ bot.start(async (ctx) => {
     delete userStates[userId]; 
 
     if (payload && payload.startsWith('room_')) {
-        if (!user || !user.country || !user.language) {
+        if (!user || !user.country) {
             return ctx.reply("🌍 *Welcome to CheckerX!*\nPlease complete your quick setup first using /start");
         }
         return ctx.replyWithMarkdown(
@@ -103,8 +103,6 @@ bot.start(async (ctx) => {
                 [Markup.button.callback('🌍 Other (Type your country)', 'country_other')]
             ])
         });
-    } else if (!user.language) {
-        return sendLanguageSelection(ctx);
     } else {
         return sendMainMenu(ctx, user);
     }
@@ -119,43 +117,33 @@ bot.action(/country_(.+)/, async (ctx) => {
         return ctx.replyWithMarkdown("🌍 *Please type the name of your country below:*");
     }
     let user = await User.findOne({ id: userId });
-    if (!user) user = new User({ id: userId, name: ctx.from.first_name, country: countryParam });
-    else user.country = countryParam;
+    if (!user) user = new User({ id: userId, name: ctx.from.first_name, country: countryParam, language: 'en' });
+    else { user.country = countryParam; user.language = 'en'; }
     await user.save();
     ctx.deleteMessage();
-    sendLanguageSelection(ctx);
+    
+    // Bypass language and directly send welcome & group link
+    await sendWelcomeAndMenu(ctx, user);
 });
 
-function sendLanguageSelection(ctx) {
-    ctx.reply("🗣 *Select your Language / Selecione seu idioma:*", {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('🇬🇧 English', 'lang_en'), Markup.button.callback('🇵🇹 Português', 'lang_pt')]
-        ])
-    });
-}
-
-bot.action(/lang_(.+)/, async (ctx) => {
-    const lang = ctx.match[1];
-    const userId = String(ctx.from.id);
-    let user = await User.findOne({ id: userId });
-    user.language = lang;
-    await user.save();
-    ctx.deleteMessage();
-
+async function sendWelcomeAndMenu(ctx, user) {
     try {
         const totalUsers = await User.countDocuments();
-        const adminMsg = `🚨 *New Player Joined!* 🚨\n\n👤 *Name:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n🌍 *Country:* ${user.country}\n🗣 *Language:* ${user.language.toUpperCase()}\n\n📊 *Total Players:* ${totalUsers} 📈`;
+        const adminMsg = `🚨 *New Player Joined!* 🚨\n\n👤 *Name:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n🌍 *Country:* ${user.country}\n\n📊 *Total Players:* ${totalUsers} 📈`;
         await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
     } catch (error) {}
 
-    const rulesMsg = lang === 'pt' ? `📜 *Regras do CheckerX:*\n1. Captura obrigatória.\n2. Timeout de 30s = Perda.\n3. Taxa de rede: 20%.\n\n🎁 *Você ganhou 20 X Coins ($0.20) de bônus de boas-vindas!*` : `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 30s Timeout = Loss.\n3. Network Fee: 20%.\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*`;
-    await ctx.replyWithMarkdown(rulesMsg);
+    const rulesMsg = `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 30s Timeout = Loss.\n3. Network Fee: 20%.\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*\n\n🌐 *Join our World Chat:* Meet players, share your match links, and get support!`;
+    
+    await ctx.replyWithMarkdown(rulesMsg, Markup.inlineKeyboard([
+        [Markup.button.url('💬 Join World Chat Group', 'https://t.me/CheckerX_Support')]
+    ]));
+
     sendMainMenu(ctx, user);
-});
+}
 
 function sendMainMenu(ctx, user) {
-    const msg = user.language === 'pt' ? `🎮 *Menu Principal*\n💰 Saldo: ${user.balance} X Coins` : `🎮 *Main Menu*\n💰 Balance: ${user.balance} X Coins`;
+    const msg = `🎮 *Main Menu*\n💰 Balance: ${user.balance} X Coins`;
     const mainMenu = Markup.keyboard([
         ['🎮 Play CheckerX', '💰 Balance'],
         ['📥 Deposit', '📤 Withdrawal'],
@@ -222,7 +210,7 @@ bot.hears('📤 Withdrawal', async (ctx) => {
     const user = await User.findOne({ id: String(userId) });
     if (user && user.isBanned) return;
     
-    // 🟢 NEW FIX: Anti-Bonus Abuse (Must play at least 1 match)
+    // 🟢 Anti-Bonus Abuse
     if ((user.wins + user.losses) === 0) {
         return ctx.replyWithMarkdown(`❌ *Withdrawal Denied!*\n\nYou must play at least **1 Match** before making a withdrawal.\n\n🎮 Click 'Play CheckerX' to join a match!`);
     }
@@ -485,15 +473,17 @@ bot.on('text', async (ctx, next) => {
         return;
     }
 
+    // Bypass language check for typed country
     if (state && state.action === 'register' && state.step === 'awaiting_country_name') {
-        if (!user) user = new User({ id: String(userId), name: ctx.from.first_name, country: text.trim() });
-        else user.country = text.trim();
+        if (!user) user = new User({ id: String(userId), name: ctx.from.first_name, country: text.trim(), language: 'en' });
+        else { user.country = text.trim(); user.language = 'en'; }
         await user.save();
         delete userStates[userId];
-        return sendLanguageSelection(ctx);
+        return sendWelcomeAndMenu(ctx, user);
     }
     
-    if (user && (!user.country || !user.language)) return ctx.reply("⚠️ Complete setup using /start");
+    if (user && !user.country) return ctx.reply("⚠️ Complete setup using /start");
+    
     if (['🎮 Play CheckerX', '💰 Balance', '📥 Deposit', '📤 Withdrawal', '🔗 Referral', '💬 Support'].includes(text)) {
         delete userStates[userId];
         return next();
