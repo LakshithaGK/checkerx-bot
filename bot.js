@@ -122,7 +122,6 @@ bot.action(/country_(.+)/, async (ctx) => {
     await user.save();
     ctx.deleteMessage();
     
-    // Bypass language and directly send welcome & group link
     await sendWelcomeAndMenu(ctx, user);
 });
 
@@ -210,7 +209,6 @@ bot.hears('📤 Withdrawal', async (ctx) => {
     const user = await User.findOne({ id: String(userId) });
     if (user && user.isBanned) return;
     
-    // 🟢 Anti-Bonus Abuse
     if ((user.wins + user.losses) === 0) {
         return ctx.replyWithMarkdown(`❌ *Withdrawal Denied!*\n\nYou must play at least **1 Match** before making a withdrawal.\n\n🎮 Click 'Play CheckerX' to join a match!`);
     }
@@ -473,7 +471,6 @@ bot.on('text', async (ctx, next) => {
         return;
     }
 
-    // Bypass language check for typed country
     if (state && state.action === 'register' && state.step === 'awaiting_country_name') {
         if (!user) user = new User({ id: String(userId), name: ctx.from.first_name, country: text.trim(), language: 'en' });
         else { user.country = text.trim(); user.language = 'en'; }
@@ -545,7 +542,9 @@ bot.on('text', async (ctx, next) => {
         user.balance -= state.amount; 
         await user.save();
         
-        const adminMsg = `📤 *NEW WITHDRAWAL* 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* ${state.amount} Coins\n📍 *Addr:* \`${text}\``;
+        // 🟢 NEW: Added User's Available Balance to the Admin Withdrawal Message
+        const adminMsg = `📤 *NEW WITHDRAWAL* 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💰 *Avail. Bal:* \`${user.balance} Coins\`\n💸 *Req. Amt:* ${state.amount} Coins\n📍 *Addr:* \`${text}\``;
+        
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
             parse_mode: 'Markdown',
             reply_markup: {
