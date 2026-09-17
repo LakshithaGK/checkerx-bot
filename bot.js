@@ -20,14 +20,16 @@ mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ Successfully connected to MongoDB Atlas!"))
     .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
+// 🟢 Database Schema (isBanned added)
 const userSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
     name: { type: String, default: 'Player' },
-    balance: { type: Number, default: 20 }, // $0.20 = 20 X Coins welcome bonus
+    balance: { type: Number, default: 20 }, 
     country: { type: String, default: null },
     language: { type: String, default: null },
     referredBy: { type: String, default: null },
     firstDepositDone: { type: Boolean, default: false },
+    isBanned: { type: Boolean, default: false },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
     history: { type: Array, default: [] },
@@ -49,7 +51,7 @@ async function getUser(id, name, referrerId = null) {
     try {
         let user = await User.findOne({ id: userId });
         if (!user) {
-            const initialBalance = (userId === ADMIN_ID) ? 1000000 : 20; // 20 Coins ($0.20) Welcome Bonus
+            const initialBalance = (userId === ADMIN_ID) ? 1000000 : 20; 
             user = new User({ 
                 id: userId, 
                 name: name || 'Player', 
@@ -63,7 +65,7 @@ async function getUser(id, name, referrerId = null) {
         }
         return user;
     } catch (e) {
-        return { id: userId, name: name || 'Player', balance: 20, wins: 0, losses: 0, history: [] };
+        return { id: userId, name: name || 'Player', balance: 20, wins: 0, losses: 0, history: [], isBanned: false };
     }
 }
 
@@ -75,6 +77,10 @@ bot.start(async (ctx) => {
     let referrerId = (payload && !payload.startsWith('room_')) ? payload : null;
 
     let user = await getUser(userId, ctx.from.first_name, referrerId);
+    
+    // 🛑 Check if user is Banned
+    if (user.isBanned) return ctx.reply("❌ Your account has been banned from CheckerX.");
+    
     delete userStates[userId]; 
 
     if (payload && payload.startsWith('room_')) {
@@ -143,7 +149,7 @@ bot.action(/lang_(.+)/, async (ctx) => {
         const totalUsers = await User.countDocuments();
         const adminMsg = `🚨 *New Player Joined!* 🚨\n\n👤 *Name:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n🌍 *Country:* ${user.country}\n🗣 *Language:* ${user.language.toUpperCase()}\n\n📊 *Total Players:* ${totalUsers} 📈`;
         await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
-    } catch (error) { console.log("Admin group error", error.message); }
+    } catch (error) {}
 
     const rulesMsg = lang === 'pt' ? `📜 *Regras do CheckerX:*\n1. Captura obrigatória.\n2. Timeout de 30s = Perda.\n3. Taxa de rede: 20%.\n\n🎁 *Você ganhou 20 X Coins ($0.20) de bônus de boas-vindas!*` : `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 30s Timeout = Loss.\n3. Network Fee: 20%.\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*`;
     await ctx.replyWithMarkdown(rulesMsg);
@@ -160,19 +166,32 @@ function sendMainMenu(ctx, user) {
     ctx.reply(msg, { parse_mode: 'Markdown', ...mainMenu });
 }
 
-bot.hears('🎮 Play CheckerX', (ctx) => ctx.replyWithMarkdown('👇 Click the *Play CheckerX* button at bottom left to play!'));
-bot.hears('🔗 Referral', (ctx) => {
+// 🟢 User Interface Buttons
+bot.hears('🎮 Play CheckerX', async (ctx) => {
+    const user = await User.findOne({ id: String(ctx.from.id) });
+    if (user && user.isBanned) return ctx.reply("❌ Your account is banned.");
+    ctx.replyWithMarkdown('👇 Click the *Play CheckerX* button at bottom left to play!');
+});
+
+bot.hears('🔗 Referral', async (ctx) => {
+    const user = await User.findOne({ id: String(ctx.from.id) });
+    if (user && user.isBanned) return;
     const botUsername = 'CheckerX_Official_Bot';
     ctx.replyWithMarkdown(`🔗 *REFERRAL PROGRAM*\nInvite friends and earn *10 X Coins ($0.10)* when they make their first deposit ($2+ min)!\n\n👇 *Your Referral Link:*\n\`https://t.me/${botUsername}?start=${ctx.from.id}\``);
 });
+
 bot.hears('💰 Balance', async (ctx) => {
     const user = await User.findOne({ id: String(ctx.from.id) });
+    if (user && user.isBanned) return;
     const totalMatches = user.wins + user.losses;
     const winRate = totalMatches > 0 ? Math.round((user.wins / totalMatches) * 100) : 0;
     const balanceMsg = `🏦 *CHECKERX WALLET* 🏦\n━━━━━━━━━━━━━━━━━━\n👤 *User:* ${user.name}\n💰 *Balance:* \`${user.balance.toLocaleString()} X Coins\`\n🏆 *Win Rate:* ${winRate}% (${user.wins}W / ${user.losses}L)\n━━━━━━━━━━━━━━━━━━`;
     ctx.replyWithMarkdown(balanceMsg);
 });
-bot.hears('📥 Deposit', (ctx) => {
+
+bot.hears('📥 Deposit', async (ctx) => {
+    const user = await User.findOne({ id: String(ctx.from.id) });
+    if (user && user.isBanned) return;
     delete userStates[ctx.from.id];
     ctx.reply("📥 *SELECT DEPOSIT METHOD*\n\n_Minimum Deposit: $2.00 (200 X Coins)_", {
         parse_mode: 'Markdown',
@@ -182,6 +201,7 @@ bot.hears('📥 Deposit', (ctx) => {
         ])
     });
 });
+
 bot.action(/dep_(.+)/, async (ctx) => {
     const method = ctx.match[1].toUpperCase();
     const userId = ctx.from.id;
@@ -191,13 +211,16 @@ bot.action(/dep_(.+)/, async (ctx) => {
     await ctx.answerCbQuery();
     ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend payment to:\n\`${address}\`\n\n👇 *How much are you depositing? (in USD)*`);
 });
+
 bot.hears('📤 Withdrawal', async (ctx) => {
     const userId = ctx.from.id;
     const user = await User.findOne({ id: String(userId) });
+    if (user && user.isBanned) return;
     if (user.balance < 300) return ctx.replyWithMarkdown(`❌ *Insufficient Balance* (Min: 300 X Coins)`);
     userStates[userId] = { action: 'withdraw', step: 'awaiting_amount' };
     ctx.replyWithMarkdown("📤 *WITHDRAWAL REQUEST*\n\n👇 *How many X Coins do you want to withdraw?*");
 });
+
 bot.action(/with_(.+)/, async (ctx) => {
     const userId = ctx.from.id;
     const state = userStates[userId];
@@ -207,61 +230,138 @@ bot.action(/with_(.+)/, async (ctx) => {
     await ctx.answerCbQuery();
     ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n📍 *Paste your Wallet Address below:*`);
 });
+
 bot.hears('💬 Support', (ctx) => ctx.reply("💬 *Customer Support*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.url('👨‍💻 Contact Admin', 'https://t.me/YourUsernameHere')]]) }));
 
-bot.command('addcoins', async (ctx) => {
+
+// ==========================================
+// 🛡️ ADMIN PANEL COMMANDS (SECURE)
+// ==========================================
+
+bot.command('addbalance', async (ctx) => {
     if (String(ctx.from.id) !== ADMIN_ID) return;
     const args = ctx.message.text.split(' ');
-    let user = await User.findOne({ id: args[1] });
-    if (user) { user.balance += parseFloat(args[2]); await user.save(); ctx.reply(`✅ Added!`); }
-    else ctx.reply(`❌ Not found!`);
+    if (args.length < 3) return ctx.reply("⚠️ Usage: /addbalance <user_id> <amount>");
+    let targetId = args[1]; let amount = parseFloat(args[2]);
+    try {
+        let user = await User.findOne({ id: targetId });
+        if (!user) return ctx.reply("❌ User not found!");
+        user.balance += amount; await user.save();
+        ctx.reply(`✅ Added ${amount} X Coins to \`${targetId}\`.\nNew Balance: ${user.balance}`, { parse_mode: 'Markdown' });
+        bot.telegram.sendMessage(targetId, `🎁 *Admin Reward:* You received *${amount} X Coins*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
+    } catch (e) { ctx.reply("❌ Error processing command."); }
 });
 
+bot.command('removebalance', async (ctx) => {
+    if (String(ctx.from.id) !== ADMIN_ID) return;
+    const args = ctx.message.text.split(' ');
+    if (args.length < 3) return ctx.reply("⚠️ Usage: /removebalance <user_id> <amount>");
+    let targetId = args[1]; let amount = parseFloat(args[2]);
+    try {
+        let user = await User.findOne({ id: targetId });
+        if (!user) return ctx.reply("❌ User not found!");
+        user.balance = Math.max(0, user.balance - amount); await user.save();
+        ctx.reply(`✅ Removed ${amount} X Coins from \`${targetId}\`.\nNew Balance: ${user.balance}`, { parse_mode: 'Markdown' });
+    } catch (e) { ctx.reply("❌ Error processing command."); }
+});
+
+bot.command('ban', async (ctx) => {
+    if (String(ctx.from.id) !== ADMIN_ID) return;
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) return ctx.reply("⚠️ Usage: /ban <user_id>");
+    try {
+        let user = await User.findOne({ id: args[1] });
+        if (!user) return ctx.reply("❌ User not found!");
+        user.isBanned = true; await user.save();
+        ctx.reply(`✅ User \`${args[1]}\` has been BANNED.`, { parse_mode: 'Markdown' });
+    } catch (e) { ctx.reply("❌ Error processing command."); }
+});
+
+bot.command('unban', async (ctx) => {
+    if (String(ctx.from.id) !== ADMIN_ID) return;
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) return ctx.reply("⚠️ Usage: /unban <user_id>");
+    try {
+        let user = await User.findOne({ id: args[1] });
+        if (!user) return ctx.reply("❌ User not found!");
+        user.isBanned = false; await user.save();
+        ctx.reply(`✅ User \`${args[1]}\` has been UNBANNED.`, { parse_mode: 'Markdown' });
+    } catch (e) { ctx.reply("❌ Error processing command."); }
+});
+
+bot.command('broadcast', async (ctx) => {
+    if (String(ctx.from.id) !== ADMIN_ID) return;
+    const msgText = ctx.message.text.replace('/broadcast', '').trim();
+    if (!msgText) return ctx.reply("⚠️ Usage: /broadcast Your message");
+    try {
+        const allUsers = await User.find({});
+        let success = 0;
+        ctx.reply(`🚀 Broadcasting to ${allUsers.length} users...`);
+        for (const u of allUsers) {
+            try { await bot.telegram.sendMessage(u.id, `📢 *ANNOUNCEMENT*\n\n${msgText}`, { parse_mode: 'Markdown' }); success++; } catch(e) {}
+        }
+        ctx.reply(`✅ Broadcast completed to ${success} users!`);
+    } catch (e) { ctx.reply("❌ Broadcast failed."); }
+});
+
+bot.command('stats', async (ctx) => {
+    if (String(ctx.from.id) !== ADMIN_ID) return;
+    try {
+        const totalUsers = await User.countDocuments();
+        const activeRoomsCount = Object.keys(activeRooms).length;
+        const onlinePlayers = Object.keys(activeSockets).length;
+        const statsMsg = `📊 *SYSTEM STATS*\n━━━━━━━━━━━━━━\n👥 *Total Users:* ${totalUsers}\n🎮 *Active Matches:* ${activeRoomsCount}\n🟢 *Online Connects:* ${onlinePlayers}\n━━━━━━━━━━━━━━`;
+        ctx.replyWithMarkdown(statsMsg);
+    } catch (e) { ctx.reply("❌ Error fetching stats."); }
+});
+
+
+// 🟢 Text Handler (Setup & Deposits)
 bot.on('text', async (ctx, next) => {
     const userId = ctx.from.id;
     const text = ctx.message.text;
     const state = userStates[userId];
+
+    let user = await User.findOne({ id: String(userId) });
+    if (user && user.isBanned) return; 
+
     if (state && state.action === 'register' && state.step === 'awaiting_country_name') {
-        let user = await User.findOne({ id: String(userId) });
         if (!user) user = new User({ id: String(userId), name: ctx.from.first_name, country: text.trim() });
         else user.country = text.trim();
         await user.save();
         delete userStates[userId];
         return sendLanguageSelection(ctx);
     }
-    let user = await User.findOne({ id: String(userId) });
+    
     if (user && (!user.country || !user.language)) return ctx.reply("⚠️ Complete setup using /start");
     if (['🎮 Play CheckerX', '💰 Balance', '📥 Deposit', '📤 Withdrawal', '🔗 Referral', '💬 Support'].includes(text)) {
         delete userStates[userId];
         return next();
     }
     if (!state) return next();
+
     if (state.action === 'deposit' && state.step === 'awaiting_amount') {
         state.amount = parseFloat(text); state.step = 'awaiting_txid';
         return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}*\n\n🔗 Paste your *TxID* below:`);
     }
     if (state.action === 'deposit' && state.step === 'awaiting_txid') {
-        // 🟢 Check First Deposit & Reward Referrer ($0.10 = 10 Coins)
         if (!user.firstDepositDone && state.amount >= 2.0) {
             user.firstDepositDone = true;
             await user.save();
             if (user.referredBy) {
                 let referrer = await User.findOne({ id: user.referredBy });
                 if (referrer) {
-                    referrer.balance += 10; // 10 X Coins ($0.10)
+                    referrer.balance += 10; 
                     await referrer.save();
                     bot.telegram.sendMessage(referrer.id, `🎉 *Referral Bonus!* Your invited friend made their first deposit. You earned *10 X Coins ($0.10)*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
                 }
             }
         }
-
-        // 🟢 Send Deposit Request to Admin Group with Direct User Contact Button
         const adminMsg = `📥 *NEW DEPOSIT* 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount}\n🔗 *TxID:* \`${text}\``;
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([[Markup.button.url('💬 Contact User', `tg://user?id=${user.id}`)]])
         }).catch(e=>{});
-
         ctx.replyWithMarkdown("✅ *Deposit Submitted Successfully!* Admins will verify your TxID.");
         delete userStates[userId]; 
         return;
@@ -275,14 +375,11 @@ bot.on('text', async (ctx, next) => {
     }
     if (state.action === 'withdraw' && state.step === 'awaiting_address') {
         user.balance -= state.amount; await user.save();
-        
-        // 🟢 Send Withdrawal Request to Admin Group with Direct User Contact Button
         const adminMsg = `📤 *NEW WITHDRAWAL* 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* ${state.amount} Coins\n📍 *Addr:* \`${text}\``;
         bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([[Markup.button.url('💬 Contact User', `tg://user?id=${user.id}`)]])
         }).catch(e=>{});
-
         ctx.replyWithMarkdown(`✅ *Withdrawal Request Submitted!* New Balance: ${user.balance} Coins`);
         delete userStates[userId]; 
         return;
@@ -291,6 +388,7 @@ bot.on('text', async (ctx, next) => {
 });
 
 bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.error("Bot Error:", err.message));
+
 
 // ==========================================
 // --- MULTIPLAYER & LIVE PLAYERS ENGINE ---
@@ -314,6 +412,8 @@ io.on('connection', (socket) => {
         try {
             if (!userData || !userData.id) return;
             const user = await getUser(userData.id, userData.first_name);
+            if (user.isBanned) return socket.emit('error_message', '❌ You are banned from CheckerX servers.');
+
             socket.userId = user.id;
             socket.userName = user.name;
             activeSockets[socket.id] = socket;
@@ -322,26 +422,29 @@ io.on('connection', (socket) => {
             const winRate = totalMatches > 0 ? Math.round((user.wins / totalMatches) * 100) : 0;
 
             socket.emit('user_synced', { balance: user.balance, name: user.name, winRate, history: user.history });
-            broadcastOnlineUsers();
-        } catch (e) { console.error(e); }
+        } catch (e) {}
     });
 
     socket.on('create_room', async (data) => {
         try {
             const user = await getUser(socket.userId, socket.userName);
+            if (user.isBanned) return socket.emit('error_message', '❌ You are banned.');
             if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
+            
             const roomId = `room_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
             socket.join(roomId);
             socket.roomId = roomId;
             privateRooms[roomId] = socket;
             socket.emit('room_created', { roomId });
-        } catch (e) { console.error(e); }
+        } catch (e) {}
     });
 
     socket.on('join_room', async (data) => {
         try {
             const user = await getUser(socket.userId, socket.userName);
+            if (user.isBanned) return socket.emit('error_message', '❌ You are banned.');
             if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
+            
             const creatorSocket = privateRooms[data.roomId];
             if (!creatorSocket) return socket.emit('error_message', 'Room expired!');
             if (creatorSocket.id === socket.id) return;
@@ -360,12 +463,13 @@ io.on('connection', (socket) => {
 
             creatorSocket.emit('match_found', { role: 'red', opponentName: socket.userName, roomId: data.roomId });
             socket.emit('match_found', { role: 'black', opponentName: creatorSocket.userName, roomId: data.roomId });
-        } catch (e) { console.error(e); }
+        } catch (e) {}
     });
 
     socket.on('find_match', async (data) => {
         try {
             const user = await getUser(socket.userId, socket.userName);
+            if (user.isBanned) return socket.emit('error_message', '❌ You are banned from playing.');
             if (user.balance < 100) return socket.emit('error_message', 'Insufficient Balance!');
 
             if (waitingPlayers.length > 0 && waitingPlayers[0].id !== socket.id) {
@@ -387,7 +491,7 @@ io.on('connection', (socket) => {
             } else {
                 if (!waitingPlayers.find(p => p.id === socket.id)) waitingPlayers.push(socket);
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {}
     });
 
     socket.on('make_move', (moveData) => {
@@ -438,7 +542,7 @@ io.on('connection', (socket) => {
                 const logMsg = `🏆 *Match Finished*\n\n🟢 *Winner:* ${winner.name} (\`${winner.id}\`)\n🔴 *Loser:* ${loserUser ? loserUser.name : 'Player'} (\`${loserSocket.userId}\`)\nℹ️ *Reason:* ${reason}`;
                 bot.telegram.sendMessage(MATCH_LOG_CHANNEL_ID, logMsg, { parse_mode: 'Markdown' }).catch(e => {});
             }
-        } catch (e) { console.error("Win handling error:", e); }
+        } catch (e) { }
     }
 
     socket.on('game_won', async () => {
@@ -474,7 +578,7 @@ io.on('connection', (socket) => {
         onlineUsersCount--;
         io.emit('online_count', onlineUsersCount); 
         delete activeSockets[socket.id];
-        broadcastOnlineUsers();
+        // broadcastOnlineUsers();
 
         const index = waitingPlayers.findIndex(p => p.id === socket.id);
         if (index !== -1) waitingPlayers.splice(index, 1);

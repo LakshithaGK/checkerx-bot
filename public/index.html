@@ -96,8 +96,6 @@
         <button class="btn-primary" style="background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000;" onclick="createPrivateRoom()">👥 CREATE ROOM</button>
         <button class="btn-secondary" onclick="document.getElementById('rulesModal').style.display='flex'">📜 GAME RULES</button>
 
-        <!-- 🟢 Active players list box removed as requested, leaving space for future features -->
-
         <div class="section-box" style="margin-top: 15px; margin-bottom: 15px;">
             <div class="section-title"><span>⚔️ Last Battle History (20)</span></div>
             <div class="history-list" id="historyList">
@@ -260,7 +258,12 @@
             });
         }
 
-        socket.on('error_message', (msg) => alert(msg));
+        socket.on('error_message', (msg) => {
+            alert(msg);
+            if(msg.includes("banned")) {
+                navTo('homeScreen');
+            }
+        });
 
         function navTo(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
