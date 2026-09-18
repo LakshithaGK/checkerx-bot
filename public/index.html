@@ -43,9 +43,6 @@
         .history-win { color: #2ea043; font-weight: bold; }
         .history-loss { color: #ff4757; font-weight: bold; }
 
-        .loader { border: 4px solid rgba(0, 242, 254, 0.2); border-top: 4px solid #00f2fe; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px 0; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
         .board-wrapper { padding: 8px; background: linear-gradient(135deg, #8B5A2B, #5c3a21); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.9); margin-top: 5px; border: 2px solid #3e2723;}
         canvas { border-radius: 8px; cursor: pointer; display: block; background: #3e2723; }
         .rotate-board { transform: rotate(180deg); }
@@ -68,6 +65,7 @@
         .waiting-loader-container { position: relative; width: 90px; height: 90px; margin: 25px auto; }
         .waiting-spinner { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 4px solid rgba(241, 196, 15, 0.1); border-top: 4px solid #f1c40f; border-radius: 50%; animation: spin 1.2s linear infinite; box-sizing: border-box; }
         .waiting-time-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-family: 'Roboto Mono', monospace; font-size: 20px; font-weight: bold; color: #f1c40f; text-shadow: 0 0 10px rgba(241, 196, 15, 0.4); }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -183,7 +181,7 @@
         </div>
     </div>
     
-    <!-- 🟢 NEW: Custom UI Notification Modal (Replaces old 'alert()') -->
+    <!-- Custom UI Notification Modal -->
     <div id="customAlertModal" class="modal">
         <div class="modal-content" style="border-color: #ff4757; box-shadow: 0 10px 40px rgba(255,71,87,0.2);">
             <h2 id="alertTitle" style="font-family: 'Orbitron'; color: #ff4757; margin-top:0; font-size: 18px;">NOTICE</h2>
@@ -238,7 +236,6 @@
 
         socket.emit('init_user', tgUser);
 
-        // 🟢 NEW: Custom UI Alert Function
         function showNotification(title, message) {
             document.getElementById('alertTitle').innerText = title;
             document.getElementById('alertDesc').innerText = message;
@@ -273,7 +270,7 @@
                     document.getElementById('waitingDesc').innerText = "Connecting with friend...";
                     
                     document.getElementById('waitingTimerDisplay').innerText = "---";
-                    clearInterval(waitingInterval);
+                    if (waitingInterval) clearInterval(waitingInterval);
 
                     socket.emit('join_room', { roomId: data.roomId, userId: tgUser.id });
                 };
@@ -296,7 +293,7 @@
             document.getElementById('waitingDesc').innerText = "Generating invite link...";
             
             document.getElementById('waitingTimerDisplay').innerText = "---";
-            clearInterval(waitingInterval);
+            if (waitingInterval) clearInterval(waitingInterval);
 
             socket.emit('create_room', { userId: tgUser.id, stake: stake });
         }
@@ -366,7 +363,7 @@
         }
 
         function startWaitingTimer(seconds, timeoutTitle, timeoutDesc) {
-            clearInterval(waitingInterval);
+            if (waitingInterval) clearInterval(waitingInterval);
             waitingTimeLeft = seconds;
             updateWaitingTimerUI();
             
@@ -396,18 +393,18 @@
             document.getElementById('waitingDesc').innerHTML = `Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins ($1.00)</b>`;
             socket.emit('find_match', { userId: tgUser.id });
             
-            // 🟢 Custom UI Alert for random match timeout
             startWaitingTimer(120, "📡 NO PLAYERS FOUND", "There are no players available at the moment. Please try again.");
         }
 
         function cancelMatchmaking() {
-            clearInterval(waitingInterval); 
+            if (waitingInterval) clearInterval(waitingInterval); 
             socket.emit('cancel_search');
             navTo('homeScreen');
         }
 
+        // 🟢 FIX: Clean timer and immediately switch to game screen
         socket.on('match_found', (data) => {
-            clearInterval(waitingInterval); 
+            if (waitingInterval) clearInterval(waitingInterval); 
             
             myRole = data.role;
             opponentName = data.opponentName;
@@ -419,6 +416,7 @@
             isMultiJumping = false;
             selectedPiece = null;
             document.getElementById('warningBanner').style.display = 'none';
+            
             navTo('gameScreen');
             setupInitialBoard();
             calculateMandatoryPieces();
@@ -457,7 +455,7 @@
         socket.on('you_lost_game', () => showEndGame(false, `Defeat! -${currentMatchStake} X Coins ($${(currentMatchStake/100).toFixed(2)}) ❌`));
 
         function startTurnTimer() {
-            clearInterval(timerInterval);
+            if (timerInterval) clearInterval(timerInterval);
             timeLeft = 30;
             updateTimerUI();
             timerInterval = setInterval(() => {
@@ -514,7 +512,7 @@
         }
 
         function showEndGame(isWin, desc) {
-            clearInterval(timerInterval);
+            if (timerInterval) clearInterval(timerInterval);
             const title = document.getElementById('endResultTitle');
             title.innerText = isWin ? "VICTORY!" : "DEFEAT";
             title.style.color = isWin ? "#00f2fe" : "#ff4757";
