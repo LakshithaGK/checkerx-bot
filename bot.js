@@ -608,7 +608,6 @@ io.on('connection', (socket) => {
         } catch (e) {}
     });
 
-    // 🟢 CREATE ROOM WITH STAKE SELECTION
     socket.on('create_room', async (data) => {
         try {
             const user = await getUser(socket.userId, socket.userName);
@@ -628,7 +627,6 @@ io.on('connection', (socket) => {
         } catch (e) {}
     });
 
-    // 🟢 GET ROOM STAKE INFO FOR CONFIRMATION MODAL
     socket.on('get_room_info', (data) => {
         const roomData = privateRooms[data.roomId];
         if (roomData) {
@@ -735,7 +733,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 🟢 DYNAMIC WIN CALCULATION BASED ON MATCH STAKE
     async function handleWin(winnerSocket, loserSocket, eventName, reason = "Normal Win") {
         if (!winnerSocket || !winnerSocket.userId) return;
         try {

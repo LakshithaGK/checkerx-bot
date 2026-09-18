@@ -64,6 +64,11 @@
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 14, 20, 0.95); z-index: 100; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
         .modal-content { background: #161b22; border: 1px solid #00f2fe; padding: 20px; border-radius: 20px; width: 95%; max-width: 360px; text-align: center; box-shadow: 0 10px 40px rgba(0,242,254,0.2); }
         .rules-list li { margin-bottom: 6px; text-align: left; font-size: 11px; }
+
+        /* 🟢 NEW: Spinning Wait Timer CSS */
+        .waiting-loader-container { position: relative; width: 90px; height: 90px; margin: 25px auto; }
+        .waiting-spinner { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 4px solid rgba(241, 196, 15, 0.1); border-top: 4px solid #f1c40f; border-radius: 50%; animation: spin 1.2s linear infinite; box-sizing: border-box; }
+        .waiting-time-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-family: 'Roboto Mono', monospace; font-size: 20px; font-weight: bold; color: #f1c40f; text-shadow: 0 0 10px rgba(241, 196, 15, 0.4); }
     </style>
 </head>
 <body>
@@ -125,10 +130,15 @@
         <button class="btn-secondary" onclick="navTo('homeScreen')">BACK</button>
     </div>
 
-    <!-- Waiting Screen -->
+    <!-- Waiting Screen (🟢 UPDATED WITH COUNTDOWN TIMER) -->
     <div id="waitingScreen" class="screen">
         <h2 style="font-family: 'Orbitron'; color: #00f2fe;" id="waitingTitle">Scanning Arena...</h2>
-        <div class="loader"></div>
+        
+        <div class="waiting-loader-container">
+            <div class="waiting-spinner"></div>
+            <div class="waiting-time-text" id="waitingTimerDisplay">00:00</div>
+        </div>
+        
         <p style="color: #c9d1d9;" id="waitingDesc">Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins ($1.00)</b></p>
         <button class="btn-secondary" style="border-color:#ff4757; color:#ff4757; margin-top:25px;" onclick="cancelMatchmaking()">CANCEL</button>
     </div>
@@ -215,8 +225,9 @@
         let timerInterval = null;
         let timeOutCount = 0;
 
-        const canvas = document.getElementById('checkersCanvas');
-        const ctx = canvas.getContext('2d');
+        // 🟢 NEW: Waiting Timer Variables
+        let waitingInterval = null;
+        let waitingTimeLeft = 0;
 
         socket.emit('init_user', tgUser);
 
@@ -246,6 +257,11 @@
                     navTo('waitingScreen');
                     document.getElementById('waitingTitle').innerText = "Joining Room...";
                     document.getElementById('waitingDesc').innerText = "Connecting with friend...";
+                    
+                    // Simple loading display (no countdown needed for joining)
+                    document.getElementById('waitingTimerDisplay').innerText = "---";
+                    clearInterval(waitingInterval);
+
                     socket.emit('join_room', { roomId: data.roomId, userId: tgUser.id });
                 };
                 
@@ -265,6 +281,11 @@
             navTo('waitingScreen');
             document.getElementById('waitingTitle').innerText = "Creating Room...";
             document.getElementById('waitingDesc').innerText = "Generating invite link...";
+            
+            // Set temporary display
+            document.getElementById('waitingTimerDisplay').innerText = "---";
+            clearInterval(waitingInterval);
+
             socket.emit('create_room', { userId: tgUser.id, stake: stake });
         }
 
@@ -276,6 +297,9 @@
             
             document.getElementById('waitingTitle').innerText = "Waiting for Friend...";
             document.getElementById('waitingDesc').innerHTML = `<b>💰 Room Stake: ${data.stake} X Coins ($${(data.stake/100).toFixed(2)})</b><br><br><b>🔗 Share invite link with your friend:</b><br><a href="https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}" target="_blank" style="color: #00f2fe; word-break: break-all; font-family: 'Roboto Mono'; font-size: 11px; display:inline-block; margin-top:8px;">${inviteLink}</a><br><br><i>Match starts when your friend confirms and joins!</i>`;
+            
+            // 🟢 5 Minutes Timeout for Private Room
+            startWaitingTimer(300, "Timeout: Your friend didn't join in time. The room has been closed.");
         });
 
         socket.on('online_count', (count) => {
@@ -330,20 +354,51 @@
             document.getElementById(id).classList.add('active-screen');
         }
 
+        // 🟢 NEW: Timer Function for Waiting Screen
+        function startWaitingTimer(seconds, timeoutMsg) {
+            clearInterval(waitingInterval);
+            waitingTimeLeft = seconds;
+            updateWaitingTimerUI();
+            
+            waitingInterval = setInterval(() => {
+                waitingTimeLeft--;
+                updateWaitingTimerUI();
+                
+                if (waitingTimeLeft <= 0) {
+                    clearInterval(waitingInterval);
+                    cancelMatchmaking();
+                    alert(timeoutMsg);
+                }
+            }, 1000);
+        }
+
+        function updateWaitingTimerUI() {
+            const m = Math.floor(waitingTimeLeft / 60).toString().padStart(2, '0');
+            const s = (waitingTimeLeft % 60).toString().padStart(2, '0');
+            const timerEl = document.getElementById('waitingTimerDisplay');
+            if(timerEl) timerEl.innerText = `${m}:${s}`;
+        }
+
         function startMatchmaking() {
             if (userBalance < 100) return alert('Insufficient Balance! You need at least 100 X Coins ($1.00) to play.');
             navTo('waitingScreen');
             document.getElementById('waitingTitle').innerText = "Scanning Arena...";
             document.getElementById('waitingDesc').innerHTML = `Finding opponent for <b style="font-family: 'Roboto Mono', monospace;">100 X Coins ($1.00)</b>`;
             socket.emit('find_match', { userId: tgUser.id });
+            
+            // 🟢 2 Minutes Timeout for Random Search
+            startWaitingTimer(120, "Timeout: No opponent found in time. Please try again.");
         }
 
         function cancelMatchmaking() {
+            clearInterval(waitingInterval); // Stop waiting timer
             socket.emit('cancel_search');
             navTo('homeScreen');
         }
 
         socket.on('match_found', (data) => {
+            clearInterval(waitingInterval); // Match found, stop timer!
+            
             myRole = data.role;
             opponentName = data.opponentName;
             currentMatchStake = data.stake || 100;
