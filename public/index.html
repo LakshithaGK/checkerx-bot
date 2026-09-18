@@ -233,6 +233,10 @@
 
         let waitingInterval = null;
         let waitingTimeLeft = 0;
+        
+        // 🟢 FIX: Define canvas carefully to ensure it's accessible globally
+        const canvas = document.getElementById('checkersCanvas');
+        const ctx = canvas ? canvas.getContext('2d') : null;
 
         socket.emit('init_user', tgUser);
 
@@ -402,26 +406,34 @@
             navTo('homeScreen');
         }
 
-        // 🟢 FIX: Clean timer and immediately switch to game screen
-        socket.on('match_found', (data) => {
-            if (waitingInterval) clearInterval(waitingInterval); 
-            
-            myRole = data.role;
-            opponentName = data.opponentName;
-            currentMatchStake = data.stake || 100;
-            currentMatchPrize = Math.floor(currentMatchStake * 1.8);
-            
-            currentTurn = 'red';
-            timeOutCount = 0;
-            isMultiJumping = false;
-            selectedPiece = null;
-            document.getElementById('warningBanner').style.display = 'none';
-            
-            navTo('gameScreen');
-            setupInitialBoard();
-            calculateMandatoryPieces();
-            renderBoard();
-            startTurnTimer();
+        // 🟢 FIX: Ensure NO duplicate listeners and run safely inside Try-Catch
+        socket.off('match_found').on('match_found', (data) => {
+            try {
+                if (waitingInterval) clearInterval(waitingInterval); 
+                
+                myRole = data.role;
+                opponentName = data.opponentName;
+                currentMatchStake = data.stake || 100;
+                currentMatchPrize = Math.floor(currentMatchStake * 1.8);
+                
+                currentTurn = 'red';
+                timeOutCount = 0;
+                isMultiJumping = false;
+                selectedPiece = null;
+                
+                const banner = document.getElementById('warningBanner');
+                if (banner) banner.style.display = 'none';
+                
+                navTo('gameScreen');
+                setupInitialBoard();
+                calculateMandatoryPieces();
+                renderBoard();
+                startTurnTimer();
+            } catch (err) {
+                // If anything fails to render, show the error clearly!
+                showNotification("SYSTEM ERROR", "Failed to load board: " + err.message);
+                navTo('homeScreen');
+            }
         });
 
         socket.on('opponent_moved', (data) => {
@@ -469,6 +481,9 @@
             const timerEl = document.getElementById('timerCircle');
             const statusEl = document.getElementById('statusText');
             const nameEl = document.getElementById('turnPlayerName');
+            
+            if (!timerEl || !statusEl || !nameEl) return; // 🟢 Safety Check
+
             timerEl.innerText = timeLeft;
 
             if (currentTurn === myRole) {
@@ -494,8 +509,10 @@
                     socket.emit('timeout_loss');
                     showEndGame(false, `Match Lost! Missed 2 turns in a row (-${currentMatchStake} X Coins). ❌`);
                 } else {
-                    banner.innerText = "⚠️ WARNING: You missed your turn! One more miss = Defeat.";
-                    banner.style.display = "block";
+                    if (banner) {
+                        banner.innerText = "⚠️ WARNING: You missed your turn! One more miss = Defeat.";
+                        banner.style.display = "block";
+                    }
 
                     currentTurn = (myRole === 'red') ? 'black' : 'red';
                     isMultiJumping = false; selectedPiece = null; legalMoves = []; mandatoryPieces = [];
@@ -520,16 +537,35 @@
             document.getElementById('gameEndModal').style.display = 'flex';
         }
 
+        // 🟢 FIX: Safe Board Initialization using basic loops (Prevents Array.map bugs on older WebViews)
         function setupInitialBoard() {
-            boardState = Array(8).fill(null).map(() => Array(8).fill(null));
-            for (let r=0; r<8; r++) for (let c=0; c<8; c++) if ((r+c)%2===1) {
-                if (r<3) boardState[r][c] = { color: 'black', isKing: false };
-                else if (r>4) boardState[r][c] = { color: 'red', isKing: false };
+            boardState = [];
+            for (let r = 0; r < 8; r++) {
+                let row = [];
+                for (let c = 0; c < 8; c++) {
+                    if ((r + c) % 2 === 1) {
+                        if (r < 3) row.push({ color: 'black', isKing: false });
+                        else if (r > 4) row.push({ color: 'red', isKing: false });
+                        else row.push(null);
+                    } else {
+                        row.push(null);
+                    }
+                }
+                boardState.push(row);
             }
         }
 
+        // 🟢 FIX: Safe Render Function
         function renderBoard() {
-            canvas.classList.toggle('rotate-board', myRole === 'black');
+            if (!ctx) return; // Prevent crash if canvas isn't loaded
+            
+            // Safe Class Toggle (Older Androids don't support toggle with 2 arguments)
+            if (myRole === 'black') {
+                canvas.classList.add('rotate-board');
+            } else {
+                canvas.classList.remove('rotate-board');
+            }
+            
             ctx.clearRect(0, 0, 320, 320);
 
             for (let r = 0; r < 8; r++) {
@@ -643,9 +679,10 @@
                 }
             }
             if (allPaths.length > 0) {
-                let maxCaps = Math.max(...allPaths.map(p => p.caps));
+                let maxCaps = Math.max.apply(Math, allPaths.map(p => p.caps)); // 🟢 Safe Max calculate for older webviews
                 allPaths.filter(p => p.caps === maxCaps).forEach(p => {
-                    if (!mandatoryPieces.some(m => m.r === p.from.r && m.c === p.from.r)) {
+                    // 🟢 FIX: Correctly check column matching (m.c === p.from.c)
+                    if (!mandatoryPieces.some(m => m.r === p.from.r && m.c === p.from.c)) {
                         mandatoryPieces.push(p.from);
                     }
                 });
@@ -675,7 +712,7 @@
             }
 
             if (allPaths.length > 0) {
-                let maxCaps = Math.max(...allPaths.map(p => p.caps));
+                let maxCaps = Math.max.apply(Math, allPaths.map(p => p.caps));
                 let bestPaths = allPaths.filter(p => p.caps === maxCaps);
                 
                 let myPaths = bestPaths.filter(p => p.from.r === r && p.from.c === c);
