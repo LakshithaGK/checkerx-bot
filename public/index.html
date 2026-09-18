@@ -42,8 +42,9 @@
         .history-item { display: flex; justify-content: space-between; align-items: center; background: rgba(13, 17, 23, 0.7); padding: 6px 10px; border-radius: 8px; font-size: 11px; }
         .history-win { color: #2ea043; font-weight: bold; }
         .history-loss { color: #ff4757; font-weight: bold; }
+        .history-draw { color: #f1c40f; font-weight: bold; }
 
-        .board-wrapper { padding: 8px; background: linear-gradient(135deg, #8B5A2B, #5c3a21); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.9); margin-top: 5px; border: 2px solid #3e2723;}
+        .board-wrapper { padding: 8px; background: linear-gradient(135deg, #8B5A2B, #5c3a21); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.9); margin-top: 5px; border: 2px solid #3e2723; position: relative; }
         canvas { border-radius: 8px; cursor: pointer; display: block; background: #3e2723; }
         .rotate-board { transform: rotate(180deg); }
         
@@ -66,6 +67,18 @@
         .waiting-spinner { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 4px solid rgba(241, 196, 15, 0.1); border-top: 4px solid #f1c40f; border-radius: 50%; animation: spin 1.2s linear infinite; box-sizing: border-box; }
         .waiting-time-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-family: 'Roboto Mono', monospace; font-size: 20px; font-weight: bold; color: #f1c40f; text-shadow: 0 0 10px rgba(241, 196, 15, 0.4); }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* 🟢 NEW: In-Game Emoji Bar Styling */
+        .emoji-bar { display: flex; justify-content: center; gap: 8px; width: 100%; max-width: 320px; margin-top: 8px; background: rgba(22, 27, 34, 0.8); padding: 6px; border-radius: 20px; border: 1px solid #30363d; }
+        .emoji-btn { background: rgba(255,255,255,0.05); border: none; font-size: 20px; cursor: pointer; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
+        .emoji-btn:active { transform: scale(1.3); }
+
+        .floating-emoji { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 65px; pointer-events: none; animation: floatUp 2s ease-out forwards; z-index: 50; }
+        @keyframes floatUp { 0% { opacity: 0; transform: translate(-50%, 0) scale(0.5); } 20% { opacity: 1; transform: translate(-50%, -20px) scale(1.2); } 80% { opacity: 1; transform: translate(-50%, -40px) scale(1); } 100% { opacity: 0; transform: translate(-50%, -70px) scale(0.8); } }
+
+        /* Leaderboard Items */
+        .earner-item { display: flex; justify-content: space-between; align-items: center; background: rgba(22, 27, 34, 0.8); border: 1px solid #30363d; padding: 8px 12px; border-radius: 10px; margin-bottom: 6px; font-size: 12px; }
+        .earner-rank { font-weight: bold; font-family: 'Orbitron'; color: #f1c40f; width: 25px; }
     </style>
 </head>
 <body>
@@ -91,10 +104,11 @@
     <!-- Home Screen -->
     <div id="homeScreen" class="screen active-screen">
         <h1>CheckerX Pro</h1>
-        <p style="color: #8b949e; margin-bottom: 15px; font-size: 13px;">1vs1 Real-time Checkers Arena</p>
+        <p style="color: #8b949e; margin-bottom: 12px; font-size: 13px;">1vs1 Real-time Checkers Arena</p>
         
         <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 FIND MATCH</button>
         <button class="btn-primary" style="background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000;" onclick="openRoomStakeMenu()">👥 CREATE ROOM</button>
+        <button class="btn-secondary" style="border-color:#f1c40f; color:#f1c40f;" onclick="openTopEarnersModal()">🏆 TOP EARNERS LIST</button>
         <button class="btn-secondary" onclick="document.getElementById('rulesModal').style.display='flex'">📜 GAME RULES</button>
 
         <div class="section-box" style="margin-top: 15px; margin-bottom: 15px;">
@@ -152,8 +166,18 @@
             </div>
             <div id="timerCircle" class="timer-circle">30</div>
         </div>
-        <div class="board-wrapper">
+        <div class="board-wrapper" id="boardWrapper">
             <canvas id="checkersCanvas" width="320" height="320"></canvas>
+        </div>
+
+        <!-- 🟢 In-Game Emoji Bar -->
+        <div class="emoji-bar">
+            <button class="emoji-btn" onclick="sendEmoji('😂')">😂</button>
+            <button class="emoji-btn" onclick="sendEmoji('😡')">😡</button>
+            <button class="emoji-btn" onclick="sendEmoji('🔥')">🔥</button>
+            <button class="emoji-btn" onclick="sendEmoji('👑')">👑</button>
+            <button class="emoji-btn" onclick="sendEmoji('👏')">👏</button>
+            <button class="emoji-btn" onclick="sendEmoji('🌝')">🌝</button>
         </div>
     </div>
 
@@ -180,6 +204,18 @@
             <button class="btn-primary" onclick="navTo('homeScreen'); document.getElementById('gameEndModal').style.display='none';">MAIN MENU</button>
         </div>
     </div>
+
+    <!-- 🟢 TOP EARNERS MODAL -->
+    <div id="topEarnersModal" class="modal">
+        <div class="modal-content" style="border-color: #f1c40f; box-shadow: 0 10px 40px rgba(241,196,15,0.2);">
+            <h2 style="font-family: 'Orbitron'; color: #f1c40f; margin-top:0; font-size: 18px;">🏆 TOP 10 EARNERS</h2>
+            <p style="color: #8b949e; font-size: 11px; margin-bottom: 15px;">Highest net profit champions on CheckerX</p>
+            <div id="topEarnersList" style="max-height: 220px; overflow-y: auto; text-align: left;">
+                <div style="text-align: center; color: #8b949e; font-size: 12px; padding: 10px;">Loading champions...</div>
+            </div>
+            <button class="btn-primary" style="background: transparent; color: #f1c40f; border: 2px solid #f1c40f; box-shadow: none; margin-top: 15px;" onclick="document.getElementById('topEarnersModal').style.display='none'">CLOSE</button>
+        </div>
+    </div>
     
     <!-- Custom UI Notification Modal -->
     <div id="customAlertModal" class="modal">
@@ -199,8 +235,8 @@
                 <li><b>2. King Flying Movement 👑:</b> Kings can move and fly across any number of free squares diagonally.</li>
                 <li><b>3. Turn Timer:</b> 30 seconds limit per turn. Missing 2 turns causes automatic forfeiture.</li>
                 <li><b>4. Disconnect Loss:</b> Closing browser tab or network drop results in immediate match defeat.</li>
-                <li><b>5. Network Fee:</b> 20% platform fee on total stake. Winner takes 90% of combined stakes.</li>
-                <li><b>6. Fair Play:</b> All matches are verified in real-time via secure server socket connection.</li>
+                <li><b>5. Profit Rate:</b> Winner receives 80% net profit (180% return on stake).</li>
+                <li><b>6. Match Draw:</b> If only 1 piece remains on each side, match is drawn (90% refunded).</li>
             </ul>
             <button class="btn-primary" onclick="document.getElementById('rulesModal').style.display='none'">GOT IT</button>
         </div>
@@ -234,7 +270,6 @@
         let waitingInterval = null;
         let waitingTimeLeft = 0;
         
-        // 🟢 FIX: Define canvas carefully to ensure it's accessible globally
         const canvas = document.getElementById('checkersCanvas');
         const ctx = canvas ? canvas.getContext('2d') : null;
 
@@ -245,6 +280,54 @@
             document.getElementById('alertDesc').innerText = message;
             document.getElementById('customAlertModal').style.display = 'flex';
         }
+
+        // 🟢 Emojis logic
+        function sendEmoji(emoji) {
+            socket.emit('send_emoji', { emoji });
+            displayFloatingEmoji(emoji);
+        }
+
+        socket.on('receive_emoji', (data) => {
+            displayFloatingEmoji(data.emoji);
+        });
+
+        function displayFloatingEmoji(emoji) {
+            const wrapper = document.getElementById('boardWrapper');
+            if (!wrapper) return;
+            const el = document.createElement('div');
+            el.className = 'floating-emoji';
+            el.innerText = emoji;
+            wrapper.appendChild(el);
+            setTimeout(() => el.remove(), 2000);
+        }
+
+        // 🟢 Top Earners Logic
+        function openTopEarnersModal() {
+            document.getElementById('topEarnersModal').style.display = 'flex';
+            socket.emit('get_top_earners');
+        }
+
+        socket.on('top_earners_data', (data) => {
+            const container = document.getElementById('topEarnersList');
+            if (!data || data.length === 0) {
+                container.innerHTML = `<div style="text-align: center; color: #8b949e; font-size: 11px;">No champions yet. Be the first!</div>`;
+                return;
+            }
+            container.innerHTML = '';
+            data.forEach((u, idx) => {
+                const item = document.createElement('div');
+                item.className = 'earner-item';
+                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx+1}`;
+                item.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="earner-rank">${medal}</span>
+                        <span style="font-weight:bold; color:#fff;">${u.name}</span>
+                    </div>
+                    <span style="color:#2ea043; font-weight:bold; font-family:'Roboto Mono';">+${u.earnings.toLocaleString()} Coins</span>
+                `;
+                container.appendChild(item);
+            });
+        });
 
         const urlParams = new URLSearchParams(window.location.search);
         let startParam = urlParams.get('room');
@@ -344,11 +427,16 @@
                 const item = document.createElement('div');
                 item.className = 'history-item';
                 const isWin = h.result === 'WIN';
+                const isDraw = h.result === 'DRAW';
                 const prize = h.prize || Math.floor((h.stake||100)*1.8);
                 const stake = h.stake || 100;
+                
+                let resText = isWin ? `👑 WIN (+${prize} Coins)` : isDraw ? `🤝 DRAW (+${prize} Coins)` : `❌ LOSS (-${stake} Coins)`;
+                let resClass = isWin ? 'history-win' : isDraw ? 'history-draw' : 'history-loss';
+
                 item.innerHTML = `
                     <span>⚔️ vs ${h.opponent} (${stake} Coins)</span>
-                    <span class="${isWin ? 'history-win' : 'history-loss'}">${isWin ? `👑 WIN (+${prize} Coins)` : `❌ LOSS (-${stake} Coins)`}</span>
+                    <span class="${resClass}">${resText}</span>
                 `;
                 hList.appendChild(item);
             });
@@ -406,7 +494,6 @@
             navTo('homeScreen');
         }
 
-        // 🟢 FIX: Ensure NO duplicate listeners and run safely inside Try-Catch
         socket.off('match_found').on('match_found', (data) => {
             try {
                 if (waitingInterval) clearInterval(waitingInterval); 
@@ -430,7 +517,6 @@
                 renderBoard();
                 startTurnTimer();
             } catch (err) {
-                // If anything fails to render, show the error clearly!
                 showNotification("SYSTEM ERROR", "Failed to load board: " + err.message);
                 navTo('homeScreen');
             }
@@ -465,6 +551,7 @@
         socket.on('opponent_disconnected', () => showEndGame(true, `Opponent Disconnected! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`));
         socket.on('opponent_timed_out', () => showEndGame(true, `Opponent Missed Turns! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`));
         socket.on('you_lost_game', () => showEndGame(false, `Defeat! -${currentMatchStake} X Coins ($${(currentMatchStake/100).toFixed(2)}) ❌`));
+        socket.on('game_draw', (data) => showEndGame(false, `Match Drawn! Only 1 piece left each. Refunded ${data.refund} X Coins (90%) 🤝`, true));
 
         function startTurnTimer() {
             if (timerInterval) clearInterval(timerInterval);
@@ -482,7 +569,7 @@
             const statusEl = document.getElementById('statusText');
             const nameEl = document.getElementById('turnPlayerName');
             
-            if (!timerEl || !statusEl || !nameEl) return; // 🟢 Safety Check
+            if (!timerEl || !statusEl || !nameEl) return;
 
             timerEl.innerText = timeLeft;
 
@@ -522,22 +609,35 @@
             }
         }
 
+        // 🟢 Draw Logic Check (1vs1 Piece remaining)
         function checkWinCondition() {
+            let myPieces = 0;
             let enemyPieces = 0;
-            for(let r=0; r<8; r++) for(let c=0; c<8; c++) if(boardState[r][c] && boardState[r][c].color !== myRole) enemyPieces++;
-            if (enemyPieces === 0) { socket.emit('game_won'); showEndGame(true, `Flawless Victory! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`); }
+            for(let r=0; r<8; r++) {
+                for(let c=0; c<8; c++) {
+                    if (boardState[r][c]) {
+                        if (boardState[r][c].color === myRole) myPieces++;
+                        else enemyPieces++;
+                    }
+                }
+            }
+            if (enemyPieces === 0) { 
+                socket.emit('game_won'); 
+                showEndGame(true, `Flawless Victory! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`); 
+            } else if (myPieces === 1 && enemyPieces === 1) {
+                socket.emit('game_draw_request');
+            }
         }
 
-        function showEndGame(isWin, desc) {
+        function showEndGame(isWin, desc, isDraw = false) {
             if (timerInterval) clearInterval(timerInterval);
             const title = document.getElementById('endResultTitle');
-            title.innerText = isWin ? "VICTORY!" : "DEFEAT";
-            title.style.color = isWin ? "#00f2fe" : "#ff4757";
+            title.innerText = isWin ? "VICTORY!" : isDraw ? "MATCH DRAW" : "DEFEAT";
+            title.style.color = isWin ? "#00f2fe" : isDraw ? "#f1c40f" : "#ff4757";
             document.getElementById('endResultDesc').innerText = desc;
             document.getElementById('gameEndModal').style.display = 'flex';
         }
 
-        // 🟢 FIX: Safe Board Initialization using basic loops (Prevents Array.map bugs on older WebViews)
         function setupInitialBoard() {
             boardState = [];
             for (let r = 0; r < 8; r++) {
@@ -555,11 +655,9 @@
             }
         }
 
-        // 🟢 FIX: Safe Render Function
         function renderBoard() {
-            if (!ctx) return; // Prevent crash if canvas isn't loaded
+            if (!ctx) return;
             
-            // Safe Class Toggle (Older Androids don't support toggle with 2 arguments)
             if (myRole === 'black') {
                 canvas.classList.add('rotate-board');
             } else {
@@ -679,9 +777,8 @@
                 }
             }
             if (allPaths.length > 0) {
-                let maxCaps = Math.max.apply(Math, allPaths.map(p => p.caps)); // 🟢 Safe Max calculate for older webviews
+                let maxCaps = Math.max.apply(Math, allPaths.map(p => p.caps));
                 allPaths.filter(p => p.caps === maxCaps).forEach(p => {
-                    // 🟢 FIX: Correctly check column matching (m.c === p.from.c)
                     if (!mandatoryPieces.some(m => m.r === p.from.r && m.c === p.from.c)) {
                         mandatoryPieces.push(p.from);
                     }

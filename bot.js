@@ -31,6 +31,8 @@ const userSchema = new mongoose.Schema({
     isBanned: { type: Boolean, default: false },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
+    draws: { type: Number, default: 0 },
+    totalEarnings: { type: Number, default: 0 },
     history: { type: Array, default: [] },
     registeredAt: { type: Date, default: Date.now }
 });
@@ -64,7 +66,7 @@ async function getUser(id, name, referrerId = null) {
         }
         return user;
     } catch (e) {
-        return { id: userId, name: name || 'Player', balance: 20, wins: 0, losses: 0, history: [], isBanned: false };
+        return { id: userId, name: name || 'Player', balance: 20, wins: 0, losses: 0, draws: 0, totalEarnings: 0, history: [], isBanned: false };
     }
 }
 
@@ -135,7 +137,7 @@ async function sendWelcomeAndMenu(ctx, user) {
         await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
     } catch (error) {}
 
-    const rulesMsg = `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 30s Timeout = Loss.\n3. Network Fee: 20%.\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*\n\n🌐 *Join our World Chat:* Meet players, share your match links, and get support!`;
+    const rulesMsg = `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 30s Timeout = Loss.\n3. Winner receives 80% profit (180% return).\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*\n\n🌐 *Join our World Chat:* Meet players, share your match links, and get support!`;
     
     await ctx.replyWithMarkdown(rulesMsg, Markup.inlineKeyboard([
         [Markup.button.url('💬 Join World Chat Group', 'https://t.me/CheckerX_Support')]
@@ -174,7 +176,7 @@ bot.hears('💰 Balance', async (ctx) => {
     const totalMatches = user.wins + user.losses;
     const winRate = totalMatches > 0 ? Math.round((user.wins / totalMatches) * 100) : 0;
     const usdVal = (user.balance / 100).toFixed(2);
-    const balanceMsg = `🏦 *CHECKERX WALLET* 🏦\n━━━━━━━━━━━━━━━━━━\n👤 *User:* ${user.name}\n💰 *Balance:* \`${user.balance.toLocaleString()} X Coins ($${usdVal})\`\n🏆 *Win Rate:* ${winRate}% (${user.wins}W / ${user.losses}L)\n━━━━━━━━━━━━━━━━━━`;
+    const balanceMsg = `🏦 *CHECKERX WALLET* 🏦\n━━━━━━━━━━━━━━━━━━\n👤 *User:* ${user.name}\n💰 *Balance:* \`${user.balance.toLocaleString()} X Coins ($${usdVal})\`\n🏆 *Win Rate:* ${winRate}\% (${user.wins}W / ${user.losses}L / ${user.draws || 0}D)\n━━━━━━━━━━━━━━━━━━`;
     ctx.replyWithMarkdown(balanceMsg);
 });
 
@@ -243,7 +245,7 @@ bot.hears('💬 Support', (ctx) => ctx.reply("💬 *Customer Support*", { parse_
 
 
 // ==========================================
-// 🛡️ ADMIN PANEL & BUTTON HANDLERS (SECURE)
+// 🛡️ ADMIN PANEL & BUTTON HANDLERS
 // ==========================================
 
 bot.command('admin', (ctx) => {
@@ -303,7 +305,7 @@ bot.action('admin_top_refs', async (ctx) => {
             const count = refCounts[refId];
             const refUser = await User.findOne({ id: refId });
             const name = refUser ? refUser.name : "Unknown";
-            msg += `${i + 1}. ${name} (\`${refId}\`) - *${count} Refs*\n`;
+            msg += `${i + 1}.${name} (\`${refId}\`) - *${count} Refs*\n`;
         }
         msg += `━━━━━━━━━━━━━━`;
         ctx.replyWithMarkdown(msg);
@@ -416,9 +418,6 @@ bot.command('broadcast', async (ctx) => {
     } catch (e) { ctx.reply("❌ Broadcast failed."); }
 });
 
-// ==========================================
-// 🟢 SECURE TEXT HANDLER (State Management)
-// ==========================================
 bot.on('text', async (ctx, next) => {
     const userId = ctx.from.id;
     const text = ctx.message.text;
@@ -446,7 +445,7 @@ bot.on('text', async (ctx, next) => {
             }
             u.balance += amount; 
             await u.save();
-            ctx.reply(`✅ *Success!*\nAdded ${amount} X Coins ($${(amount/100).toFixed(2)}) to ${u.name}.\nNew Balance: ${u.balance} Coins`, {parse_mode: 'Markdown'});
+            ctx.reply(`✅ *Success!*\nAdded ${amount} X Coins ($${(amount/100).toFixed(2)}) to ${u.name}.\nNew Balance:${u.balance} Coins`, {parse_mode: 'Markdown'});
             bot.telegram.sendMessage(state.targetId, `🎁 *Admin Reward:* You received *${amount} X Coins ($${(amount/100).toFixed(2)})*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
         } catch(e) { ctx.reply("❌ Error."); }
         delete userStates[userId];
@@ -472,7 +471,7 @@ bot.on('text', async (ctx, next) => {
             }
             u.balance = Math.max(0, u.balance - amount); 
             await u.save();
-            ctx.reply(`✅ *Success!*\nRemoved ${amount} X Coins from ${u.name}.\nNew Balance: ${u.balance} Coins`, {parse_mode: 'Markdown'});
+            ctx.reply(`✅ *Success!*\nRemoved ${amount} X Coins from ${u.name}.\nNew Balance:${u.balance} Coins`, {parse_mode: 'Markdown'});
         } catch(e) { ctx.reply("❌ Error."); }
         delete userStates[userId];
         return;
@@ -570,22 +569,13 @@ bot.on('text', async (ctx, next) => {
     return next();
 });
 
-bot.launch().then(() => console.log("Bot launched! (Secure Edition)")).catch((err) => console.error("Bot Error:", err.message));
+bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.error("Bot Error:", err.message));
 
-
-// ==========================================
-// 🛡️ MULTIPLAYER & LIVE PLAYERS ENGINE (SECURE)
-// ==========================================
 const waitingPlayers = [];
 const privateRooms = {}; 
 const activeRooms = {};
 const activeSockets = {}; 
 let onlineUsersCount = 0; 
-
-function broadcastOnlineUsers() {
-    const usersList = Object.values(activeSockets).map(s => ({ id: s.userId, name: s.userName }));
-    io.emit('online_users_list', usersList);
-}
 
 io.on('connection', (socket) => {
     onlineUsersCount++;
@@ -606,6 +596,24 @@ io.on('connection', (socket) => {
 
             socket.emit('user_synced', { balance: user.balance, name: user.name, winRate, history: user.history });
         } catch (e) {}
+    });
+
+    socket.on('get_top_earners', async () => {
+        try {
+            const topUsers = await User.find({ totalEarnings: { $gt: 0 } }).sort({ totalEarnings: -1 }).limit(10);
+            const formattedList = topUsers.map(u => ({
+                name: u.name,
+                earnings: u.totalEarnings,
+                wins: u.wins
+            }));
+            socket.emit('top_earners_data', formattedList);
+        } catch(e) {}
+    });
+
+    socket.on('send_emoji', (data) => {
+        if (socket.roomId && activeRooms[socket.roomId]) {
+            socket.to(socket.roomId).emit('receive_emoji', { emoji: data.emoji });
+        }
     });
 
     socket.on('create_room', async (data) => {
@@ -739,11 +747,13 @@ io.on('connection', (socket) => {
             const room = activeRooms[winnerSocket.roomId];
             const matchStake = room ? (room.stake || 100) : 100;
             const prizeCoins = Math.floor(matchStake * 1.8);
+            const netProfit = prizeCoins - matchStake;
 
             const winner = await User.findOne({ id: winnerSocket.userId });
             if (winner) {
                 winner.balance += prizeCoins;
                 winner.wins += 1;
+                winner.totalEarnings += netProfit;
                 winner.history.unshift({ result: 'WIN', opponent: loserSocket && loserSocket.userName ? loserSocket.userName : 'Opponent', time: Date.now(), stake: matchStake, prize: prizeCoins });
                 if (winner.history.length > 20) winner.history.pop();
                 await winner.save();
@@ -773,6 +783,46 @@ io.on('connection', (socket) => {
             }
         } catch (e) { }
     }
+
+    async function handleDraw(room) {
+        if (!room || !room.p1 || !room.p2) return;
+        try {
+            const matchStake = room.stake || 100;
+            const refundCoins = Math.floor(matchStake * 0.9);
+
+            const u1 = await User.findOne({ id: room.p1.userId });
+            const u2 = await User.findOne({ id: room.p2.userId });
+
+            if (u1) {
+                u1.balance += refundCoins;
+                u1.draws = (u1.draws || 0) + 1;
+                u1.history.unshift({ result: 'DRAW', opponent: u2 ? u2.name : 'Opponent', time: Date.now(), stake: matchStake, prize: refundCoins });
+                if (u1.history.length > 20) u1.history.pop();
+                await u1.save();
+                room.p1.emit('user_synced', { balance: u1.balance, name: u1.name, winRate: Math.round((u1.wins/(u1.wins+u1.losses||1))*100), history: u1.history });
+            }
+
+            if (u2) {
+                u2.balance += refundCoins;
+                u2.draws = (u2.draws || 0) + 1;
+                u2.history.unshift({ result: 'DRAW', opponent: u1 ? u1.name : 'Opponent', time: Date.now(), stake: matchStake, prize: refundCoins });
+                if (u2.history.length > 20) u2.history.pop();
+                await u2.save();
+                room.p2.emit('user_synced', { balance: u2.balance, name: u2.name, winRate: Math.round((u2.wins/(u2.wins+u2.losses||1))*100), history: u2.history });
+            }
+
+            room.p1.emit('game_draw', { refund: refundCoins, stake: matchStake });
+            room.p2.emit('game_draw', { refund: refundCoins, stake: matchStake });
+        } catch (e) {}
+    }
+
+    socket.on('game_draw_request', async () => {
+        if (socket.roomId && activeRooms[socket.roomId]) {
+            const room = activeRooms[socket.roomId];
+            await handleDraw(room);
+            delete activeRooms[socket.roomId];
+        }
+    });
 
     socket.on('game_won', async () => {
         if (socket.roomId && activeRooms[socket.roomId]) {
