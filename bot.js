@@ -380,7 +380,6 @@ bot.action(/^reject_wit_(\d+)_([\d.]+)$/, async (ctx) => {
     }
 });
 
-// 🛡️ BATTLE-TESTED TEXT HANDLER
 bot.on('message', async (ctx) => {
     try {
         if (!ctx.message || !ctx.message.text) return;
@@ -455,6 +454,7 @@ bot.on('message', async (ctx) => {
         
         if (!state) return;
 
+        // FIXED MARKDOWN PARSING ISSUE HERE!
         if (state.action === 'deposit' && state.step === 'awaiting_amount') {
             const amount = parseFloat(text);
             if (isNaN(amount) || amount < 2.0) {
@@ -463,8 +463,11 @@ bot.on('message', async (ctx) => {
             state.amount = amount; 
             state.step = 'awaiting_txid';
             
-            let idType = state.method === 'BINANCE' ? '*Binance Pay ID / Email*' : '*TxID (Transaction Hash)*';
-            return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}* (${state.amount * 100} X Coins)\n\n3️⃣ *Now, paste your ${idType} below to verify your payment:*\n\n_📞 If you have any issues, contact @CheckerX_Admin_`);
+            let idType = state.method === 'BINANCE' ? 'Binance Pay ID / Email' : 'TxID (Transaction Hash)';
+            
+            let responseMsg = `✅ Amount saved: <b>$${state.amount}</b> (${state.amount * 100} X Coins)\n\n3️⃣ <b>Now, paste your ${idType} below to verify your payment:</b>\n\n📞 <i>If you have any issues, contact @CheckerX_Admin</i>`;
+            
+            return ctx.reply(responseMsg, { parse_mode: 'HTML' });
         }
 
         if (state.action === 'deposit' && state.step === 'awaiting_txid') {
