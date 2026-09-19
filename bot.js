@@ -236,7 +236,7 @@ bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     await ctx.answerCbQuery();
     
     let promptMsg = state.method === 'BINANCE' 
-        ? '📍 *Paste your Binance Pay ID or Binance Email below:*' 
+        ? '📍 *After do transection to above pay id , paste your Binance Pay ID or Binance Email below:*' 
         : `📍 *Paste your ${state.method} TRC20 Wallet Address below (Make sure it is TRC20 network):*`;
         
     ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n${promptMsg}`);
