@@ -8,14 +8,14 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Poppins:wght@400;600&family=Roboto+Mono:wght@500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Poppins:wght@400;600;700&family=Roboto+Mono:wght@500;700&display=swap');
         * { box-sizing: border-box; user-select: none; }
         body { margin: 0; background: radial-gradient(circle at center, #1a1e29 0%, #0b0e14 100%); color: #fff; font-family: 'Poppins', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
         
         .top-bar { width: 100%; max-width: 420px; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(22, 27, 34, 0.95); position: fixed; top: 0; z-index: 10; border-bottom: 2px solid #00f2fe; box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2); }
         .user-info-box { display: flex; align-items: center; gap: 10px; }
         .avatar-container { position: relative; }
-        .avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #00f2fe; display: block; }
+        .avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #00f2fe; display: block; object-fit: cover; }
         
         .balance-pill { background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-family: 'Roboto Mono', monospace; color: #00f2fe; font-size: 12px; text-shadow: 0 0 5px rgba(0,242,254,0.5); text-align: right; }
         .winrate-badge { background: rgba(241, 196, 15, 0.15); border: 1px solid #f1c40f; color: #f1c40f; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-family: 'Roboto Mono', monospace; font-weight: bold; text-align: center; }
@@ -59,6 +59,8 @@
         .warning-banner { width: 100%; max-width: 320px; background: rgba(255, 71, 87, 0.15); border: 1px solid #ff4757; color: #ff4757; padding: 5px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 6px; display: none; text-align: center; }
         .match-warning-notice { width: 100%; max-width: 320px; background: rgba(255, 193, 7, 0.15); border: 1px solid #ffc107; color: #ffc107; padding: 5px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 6px; text-align: center; }
 
+        .draw-countdown-box { display: none; width: 100%; max-width: 320px; background: rgba(241, 196, 15, 0.15); border: 1px solid #f1c40f; color: #f1c40f; padding: 6px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 6px; text-align: center; }
+
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(11, 14, 20, 0.95); z-index: 100; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
         .modal-content { background: #161b22; border: 1px solid #00f2fe; padding: 20px; border-radius: 20px; width: 95%; max-width: 360px; text-align: center; box-shadow: 0 10px 40px rgba(0,242,254,0.2); }
         .rules-list li { margin-bottom: 6px; text-align: left; font-size: 11px; }
@@ -84,7 +86,7 @@
     <div class="top-bar">
         <div class="user-info-box">
             <div class="avatar-container">
-                <img src="https://via.placeholder.com/38/00f2fe/000000?text=X" class="avatar" id="userAvatar">
+                <img src="" class="avatar" id="userAvatar">
             </div>
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
                 <span id="userName" style="font-weight: 600; font-size: 14px;">Player</span>
@@ -122,11 +124,11 @@
         <h2 style="font-family: 'Orbitron'; color: #00f2fe; margin-bottom: 2px;">CREATE PRIVATE ROOM</h2>
         <p style="color: #8b949e; font-size: 12px; margin-bottom: 15px;">Select match stake amount:</p>
         <div style="display: flex; flex-direction: column; gap: 8px; width: 90%;">
-            <button class="btn-primary" style="margin-top:0;" onclick="confirmCreateRoom(50)">💰 50 X Coins ($0.50)</button>
-            <button class="btn-primary" style="margin-top:0;" onclick="confirmCreateRoom(100)">💰 100 X Coins ($1.00)</button>
-            <button class="btn-primary" style="margin-top:0;" onclick="confirmCreateRoom(200)">💰 200 X Coins ($2.00)</button>
-            <button class="btn-primary" style="margin-top:0;" onclick="confirmCreateRoom(500)">💰 500 X Coins ($5.00)</button>
-            <button class="btn-primary" style="margin-top:0;" onclick="confirmCreateRoom(1000)">💰 1000 X Coins ($10.00)</button>
+            <button class="btn-primary" style="margin-top:0; font-family: 'Roboto Mono', monospace; font-size: 16px; font-weight: 700;" onclick="confirmCreateRoom(50)">💰 50 X Coins ($0.50)</button>
+            <button class="btn-primary" style="margin-top:0; font-family: 'Roboto Mono', monospace; font-size: 16px; font-weight: 700;" onclick="confirmCreateRoom(100)">💰 100 X Coins ($1.00)</button>
+            <button class="btn-primary" style="margin-top:0; font-family: 'Roboto Mono', monospace; font-size: 16px; font-weight: 700;" onclick="confirmCreateRoom(200)">💰 200 X Coins ($2.00)</button>
+            <button class="btn-primary" style="margin-top:0; font-family: 'Roboto Mono', monospace; font-size: 16px; font-weight: 700;" onclick="confirmCreateRoom(500)">💰 500 X Coins ($5.00)</button>
+            <button class="btn-primary" style="margin-top:0; font-family: 'Roboto Mono', monospace; font-size: 16px; font-weight: 700;" onclick="confirmCreateRoom(1000)">💰 1000 X Coins ($10.00)</button>
         </div>
         <button class="btn-secondary" style="margin-top: 15px;" onclick="navTo('homeScreen')">BACK</button>
     </div>
@@ -156,6 +158,9 @@
     <div id="gameScreen" class="screen">
         <div class="match-warning-notice">⚠️ Do not close or switch tabs, or you will lose!</div>
         <div id="warningBanner" class="warning-banner">⚠️ Warning: You missed your turn! One more miss = Defeat.</div>
+        <div id="drawCountdownBox" class="draw-countdown-box">
+            ⚠️ 1 VS 1 DETECTED! <span id="drawMovesLeft" style="font-size: 14px; font-family: 'Roboto Mono', monospace; font-weight: bold; margin-left: 5px;">20</span> MOVES TO DRAW
+        </div>
 
         <div class="timer-container">
             <div class="timer-info">
@@ -233,7 +238,7 @@
                 <li><b>3. Turn Timer:</b> 30 seconds limit per turn. Missing 2 turns causes automatic forfeiture.</li>
                 <li><b>4. Disconnect Loss:</b> Closing browser tab or network drop results in immediate match defeat.</li>
                 <li><b>5. Profit Rate:</b> Winner receives 80% net profit (180% return on stake).</li>
-                <li><b>6. Match Draw:</b> If exactly 1 King remains on each side, match is drawn (90% refunded).</li>
+                <li><b>6. Match Draw:</b> 20-move limit activates when 1 vs 1 piece remains (90% refunded).</li>
             </ul>
             <button class="btn-primary" onclick="document.getElementById('rulesModal').style.display='none'">GOT IT</button>
         </div>
@@ -251,6 +256,10 @@
         let currentMatchStake = 100;
         let currentMatchPrize = 180;
 
+        // Profile Avatar Logic
+        let avatarUrl = tgUser?.photo_url ? tgUser.photo_url : `https://ui-avatars.com/api/?name=${encodeURIComponent(myName)}&background=00f2fe&color=000&bold=true`;
+        document.getElementById('userAvatar').src = avatarUrl;
+
         let myRole = ''; 
         let currentTurn = 'red';
         const tileSize = 40;
@@ -266,6 +275,8 @@
 
         let waitingInterval = null;
         let waitingTimeLeft = 0;
+        
+        let drawCountdown = -1; // New Draw Feature
         
         const canvas = document.getElementById('checkersCanvas');
         const ctx = canvas ? canvas.getContext('2d') : null;
@@ -503,6 +514,9 @@
                 isMultiJumping = false;
                 selectedPiece = null;
                 
+                drawCountdown = -1;
+                document.getElementById('drawCountdownBox').style.display = 'none';
+
                 const banner = document.getElementById('warningBanner');
                 if (banner) banner.style.display = 'none';
                 
@@ -528,6 +542,8 @@
             selectedPiece = null;
             legalMoves = [];
             
+            checkWinCondition(); 
+
             if(currentTurn === myRole) {
                 calculateMandatoryPieces();
                 startTurnTimer();
@@ -539,6 +555,7 @@
 
         socket.on('turn_passed', (data) => {
             currentTurn = data.nextTurn;
+            checkWinCondition(); 
             if(currentTurn === myRole) { calculateMandatoryPieces(); startTurnTimer(); }
             renderBoard();
         });
@@ -546,7 +563,7 @@
         socket.on('opponent_disconnected', () => showEndGame(true, `Opponent Disconnected! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`));
         socket.on('opponent_timed_out', () => showEndGame(true, `Opponent Missed Turns! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`));
         socket.on('you_lost_game', () => showEndGame(false, `Defeat! -${currentMatchStake} X Coins ($${(currentMatchStake/100).toFixed(2)}) ❌`));
-        socket.on('game_draw', (data) => showEndGame(false, `Match Drawn! Both players have 1 King left. Refunded ${data.refund} X Coins (90%) 🤝`, true));
+        socket.on('game_draw', (data) => showEndGame(false, `Match Drawn! Turn limit reached. Refunded ${data.refund} X Coins (90%) 🤝`, true));
 
         function startTurnTimer() {
             if (timerInterval) clearInterval(timerInterval);
@@ -605,26 +622,64 @@
         }
 
         function checkWinCondition() {
-            let myPieces = [];
-            let enemyPieces = [];
+            let myCount = 0;
+            let enemyCount = 0;
             
             for(let r=0; r<8; r++) {
                 for(let c=0; c<8; c++) {
                     if (boardState[r][c]) {
-                        if (boardState[r][c].color === myRole) {
-                            myPieces.push(boardState[r][c]);
-                        } else {
-                            enemyPieces.push(boardState[r][c]);
-                        }
+                        if (boardState[r][c].color === myRole) myCount++;
+                        else enemyCount++;
                     }
                 }
             }
 
-            if (enemyPieces.length === 0) { 
-                socket.emit('game_won'); 
-                showEndGame(true, `Flawless Victory! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`); 
-            } else if (myPieces.length === 1 && enemyPieces.length === 1 && myPieces[0].isKing && enemyPieces[0].isKing) {
-                socket.emit('game_draw_request');
+            if (enemyCount === 0) { 
+                if (currentTurn !== myRole) { 
+                    socket.emit('game_won'); 
+                    showEndGame(true, `Flawless Victory! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`); 
+                }
+                return;
+            } 
+
+            if (myCount === 1 && enemyCount === 1) {
+                if (drawCountdown === -1) {
+                    drawCountdown = 20; 
+                    document.getElementById('drawCountdownBox').style.display = 'block';
+                } else {
+                    drawCountdown--;
+                }
+                
+                updateDrawUI();
+
+                if (drawCountdown <= 0 && currentTurn === myRole) {
+                    socket.emit('game_draw_request');
+                }
+            } else {
+                drawCountdown = -1;
+                document.getElementById('drawCountdownBox').style.display = 'none';
+            }
+        }
+
+        function updateDrawUI() {
+            const box = document.getElementById('drawCountdownBox');
+            const text = document.getElementById('drawMovesLeft');
+            if (drawCountdown <= 0) return;
+            
+            if (drawCountdown <= 4) {
+                box.style.background = 'rgba(255, 71, 87, 0.15)';
+                box.style.borderColor = '#ff4757';
+                box.style.color = '#ff4757';
+                if (drawCountdown <= 2) {
+                    text.innerHTML = `${drawCountdown} <br><span style="font-size:10px; color:#fff; font-family:'Poppins';">🚨 FINAL TURN - MATCH WILL DRAW!</span>`;
+                } else {
+                    text.innerText = drawCountdown;
+                }
+            } else {
+                box.style.background = 'rgba(241, 196, 15, 0.15)';
+                box.style.borderColor = '#f1c40f';
+                box.style.color = '#f1c40f';
+                text.innerText = drawCountdown;
             }
         }
 
@@ -902,10 +957,11 @@
             
             socket.emit('make_move', { from: oldSelected, to: { r, c }, captured: move.cap, promoted, nextTurn });
             currentTurn = nextTurn; 
-            renderBoard();
             
+            checkWinCondition(); 
+
+            renderBoard();
             if(!isMultiJumping) startTurnTimer(); 
-            checkWinCondition();
         }
     </script>
 </body>

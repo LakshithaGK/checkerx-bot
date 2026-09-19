@@ -137,7 +137,7 @@ async function sendWelcomeAndMenu(ctx, user) {
         await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
     } catch (error) {}
 
-    const rulesMsg = `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 👑 *FLYING KING:* Kings move across empty squares, but must land immediately after the last captured piece!\n3. 30s Timeout = Loss.\n4. Winner receives 80% profit.\n5. Match Draw: If 1 King vs 1 King left.\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*\n\n🌐 *Join our World Chat:* Meet players, share your match links, and get support!`;
+    const rulesMsg = `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 👑 *FLYING KING:* Kings move across empty squares, but must land immediately after the last captured piece!\n3. 30s Timeout = Loss.\n4. Winner receives 80% profit.\n5. Match Draw: 20-move limit activates when 1 vs 1 piece remains.\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*\n\n🌐 *Join our World Chat:* Meet players, share your match links, and get support!`;
     
     await ctx.replyWithMarkdown(rulesMsg, Markup.inlineKeyboard([
         [Markup.button.url('💬 Join World Chat Group', 'https://t.me/CheckerX_Support')]
@@ -188,7 +188,7 @@ bot.hears('📥 Deposit', async (ctx) => {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.callback('🔶 Binance Pay', 'dep_binance'), Markup.button.callback('💵 USDT (TRC20)', 'dep_usdt')],
-            [Markup.button.callback('🔴 TRX (TRC20)', 'dep_trx'), Markup.button.callback('💎 TON', 'dep_ton')]
+            [Markup.button.callback('🔴 TRX (TRC20)', 'dep_trx'), Markup.button.callback('🪙 DGB', 'dep_dgb')]
         ])
     });
 });
@@ -202,13 +202,13 @@ bot.action(/^dep_([a-zA-Z_]+)$/, async (ctx) => {
         address = 'Binance Pay ID: `123456789`'; 
     } else if (method === 'USDT' || method === 'TRX') {
         address = 'TRC20 Wallet Address:\n`Your_TRC20_Wallet_Address_Here`';
-    } else if (method === 'TON') {
-        address = 'TON Wallet Address:\n`Your_TON_Wallet_Address_Here`';
+    } else if (method === 'DGB') {
+        address = 'DGB Wallet Address:\n`Your_DGB_Wallet_Address_Here`';
     }
 
-    userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount' };
+    userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount', address: address };
     await ctx.answerCbQuery();
-    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\nSend payment to:\n${address}\n\n👇 *How much are you depositing? (Min $2.00)*`);
+    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\n1️⃣ *Make your payment to:*\n${address}\n\n2️⃣ *How much are you depositing? (Min $2.00)*\n_(Type the amount below)_`);
 });
 
 bot.hears('📤 Withdrawal', async (ctx) => {
@@ -236,7 +236,7 @@ bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     
     let promptMsg = state.method === 'BINANCE' 
         ? '📍 *Paste your Binance Pay ID or Binance Email below:*' 
-        : `📍 *Paste your ${state.method} TRC20 Wallet Address below (Make sure it is TRC20 network):*`;
+        : `📍 *Paste your ${state.method} Wallet Address below:*`;
         
     ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n${promptMsg}`);
 });
@@ -379,45 +379,6 @@ bot.action(/^reject_wit_(\d+)_([\d.]+)$/, async (ctx) => {
     }
 });
 
-bot.command('ban', async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_ID) return;
-    const args = ctx.message.text.split(' ');
-    if (args.length < 2) return ctx.reply("⚠️ Usage: /ban <user_id>");
-    try {
-        let user = await User.findOne({ id: args[1] });
-        if (!user) return ctx.reply("❌ User not found!");
-        user.isBanned = true; await user.save();
-        ctx.reply(`✅ User \`${args[1]}\` has been BANNED.`);
-    } catch (e) { ctx.reply("❌ Error."); }
-});
-
-bot.command('unban', async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_ID) return;
-    const args = ctx.message.text.split(' ');
-    if (args.length < 2) return ctx.reply("⚠️ Usage: /unban <user_id>");
-    try {
-        let user = await User.findOne({ id: args[1] });
-        if (!user) return ctx.reply("❌ User not found!");
-        user.isBanned = false; await user.save();
-        ctx.reply(`✅ User \`${args[1]}\` has been UNBANNED.`);
-    } catch (e) { ctx.reply("❌ Error."); }
-});
-
-bot.command('broadcast', async (ctx) => {
-    if (String(ctx.from.id) !== ADMIN_ID) return;
-    const msgText = ctx.message.text.replace('/broadcast', '').trim();
-    if (!msgText) return ctx.reply("⚠️ Usage: /broadcast Your message");
-    try {
-        const allUsers = await User.find({});
-        let success = 0;
-        ctx.reply(`🚀 Broadcasting to ${allUsers.length} users...`);
-        for (const u of allUsers) {
-            try { await bot.telegram.sendMessage(u.id, `📢 *ANNOUNCEMENT*\n\n${msgText}`, { parse_mode: 'Markdown' }); success++; } catch(e) {}
-        }
-        ctx.reply(`✅ Broadcast completed to ${success} users!`);
-    } catch (e) { ctx.reply("❌ Broadcast failed."); }
-});
-
 bot.on('text', async (ctx, next) => {
     const userId = ctx.from.id;
     const text = ctx.message.text;
@@ -502,7 +463,7 @@ bot.on('text', async (ctx, next) => {
         state.step = 'awaiting_txid';
         
         let idType = state.method === 'BINANCE' ? '*Binance Pay ID / Email*' : '*TxID (Transaction Hash)*';
-        return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}* (${state.amount * 100} X Coins)\n\n🔗 Paste your ${idType} below:`);
+        return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}* (${state.amount * 100} X Coins)\n\n3️⃣ *Now, paste your ${idType} below to verify your payment:*\n\n_📞 If you have any issues, contact @CheckerX_Admin_`);
     }
 
     if (state.action === 'deposit' && state.step === 'awaiting_txid') {
@@ -519,7 +480,7 @@ bot.on('text', async (ctx, next) => {
             }
         }).catch(e=>{});
         
-        ctx.replyWithMarkdown("✅ *Deposit Submitted Successfully!* Admins will verify your transaction.");
+        ctx.replyWithMarkdown("✅ *Deposit Submitted Successfully!* Admins will verify your transaction shortly.");
         delete userStates[userId]; 
         return;
     }
@@ -536,7 +497,7 @@ bot.on('text', async (ctx, next) => {
         state.step = 'awaiting_method';
         return ctx.reply("💳 Select withdrawal method:", Markup.inlineKeyboard([
             [Markup.button.callback('🔶 Binance', 'with_binance'), Markup.button.callback('💵 USDT', 'with_usdt')],
-            [Markup.button.callback('🔴 TRX', 'with_trx'), Markup.button.callback('💎 TON', 'with_ton')]
+            [Markup.button.callback('🔴 TRX', 'with_trx'), Markup.button.callback('🪙 DGB', 'with_dgb')]
         ]));
     }
 
@@ -810,6 +771,9 @@ io.on('connection', (socket) => {
                 await u2.save();
                 room.p2.emit('user_synced', { balance: u2.balance, name: u2.name, winRate: Math.round((u2.wins/(u2.wins+u2.losses||1))*100), history: u2.history });
             }
+
+            const logMsg = `🤝 *Match Draw (1v1 Turn Limit)*\n\n👤 *Player 1:* ${u1 ? u1.name : 'Unknown'} (\`${u1 ? u1.id : 'N/A'}\`)\n👤 *Player 2:* ${u2 ? u2.name : 'Unknown'} (\`${u2 ? u2.id : 'N/A'}\`)\n💰 *Stake:* ${matchStake} Coins\nℹ️ *Reason:* 20 moves limit reached. Coins refunded (90%).`;
+            bot.telegram.sendMessage(MATCH_LOG_CHANNEL_ID, logMsg, { parse_mode: 'Markdown' }).catch(e => {});
 
             room.p1.emit('game_draw', { refund: refundCoins, stake: matchStake });
             room.p2.emit('game_draw', { refund: refundCoins, stake: matchStake });
