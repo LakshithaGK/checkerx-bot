@@ -223,13 +223,13 @@
         </div>
     </div>
 
-    <!-- Rules Modal -->
+    <!-- 🟢 UPDATED: Rules Modal with Highlighted Flying King Rule -->
     <div id="rulesModal" class="modal">
         <div class="modal-content">
             <h3 style="color: #00f2fe; font-family: 'Orbitron'; margin-top:0;">📜 PRO RULES</h3>
             <ul class="rules-list" style="color: #c9d1d9; line-height: 1.4; padding-left: 15px;">
                 <li><b>1. Majority Capture:</b> You must choose the path that captures the maximum number of pieces.</li>
-                <li><b>2. King Flying Movement 👑:</b> Kings can move and fly across any number of free squares diagonally.</li>
+                <li style="color: #f1c40f; background: rgba(241, 196, 15, 0.15); padding: 8px; border-radius: 6px; border-left: 3px solid #f1c40f; margin: 8px 0; font-size: 12px;"><b>👑 Special Flying King:</b> Kings can move and capture across multiple empty squares diagonally!</li>
                 <li><b>3. Turn Timer:</b> 30 seconds limit per turn. Missing 2 turns causes automatic forfeiture.</li>
                 <li><b>4. Disconnect Loss:</b> Closing browser tab or network drop results in immediate match defeat.</li>
                 <li><b>5. Profit Rate:</b> Winner receives 80% net profit (180% return on stake).</li>
@@ -604,7 +604,6 @@
             }
         }
 
-        // 🟢 UPDATED: Draw Logic Check (Exactly 1 King vs 1 King remaining)
         function checkWinCondition() {
             let myPieces = [];
             let enemyPieces = [];
@@ -625,7 +624,6 @@
                 socket.emit('game_won'); 
                 showEndGame(true, `Flawless Victory! +${currentMatchPrize} X Coins ($${(currentMatchPrize/100).toFixed(2)}) 🎉`); 
             } else if (myPieces.length === 1 && enemyPieces.length === 1 && myPieces[0].isKing && enemyPieces[0].isKing) {
-                // Draw ONLY if both sides have exactly 1 King left!
                 socket.emit('game_draw_request');
             }
         }
