@@ -181,9 +181,10 @@ bot.hears('💰 Balance', async (ctx) => {
 });
 
 bot.hears('📥 Deposit', async (ctx) => {
-    const user = await User.findOne({ id: String(ctx.from.id) });
+    const userId = String(ctx.from.id);
+    const user = await User.findOne({ id: userId });
     if (user && user.isBanned) return;
-    delete userStates[ctx.from.id];
+    delete userStates[userId];
     ctx.reply("📥 *SELECT DEPOSIT METHOD*\n\n_Minimum Deposit: $2.00 (200 X Coins)_", {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
@@ -195,7 +196,7 @@ bot.hears('📥 Deposit', async (ctx) => {
 
 bot.action(/^dep_([a-zA-Z_]+)$/, async (ctx) => {
     const method = ctx.match[1].toUpperCase();
-    const userId = ctx.from.id;
+    const userId = String(ctx.from.id);
     let address = '';
     
     if (method === 'BINANCE') {
@@ -212,8 +213,8 @@ bot.action(/^dep_([a-zA-Z_]+)$/, async (ctx) => {
 });
 
 bot.hears('📤 Withdrawal', async (ctx) => {
-    const userId = ctx.from.id;
-    const user = await User.findOne({ id: String(userId) });
+    const userId = String(ctx.from.id);
+    const user = await User.findOne({ id: userId });
     if (user && user.isBanned) return;
     
     if ((user.wins + user.losses) === 0) {
@@ -227,7 +228,7 @@ bot.hears('📤 Withdrawal', async (ctx) => {
 });
 
 bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
-    const userId = ctx.from.id;
+    const userId = String(ctx.from.id);
     const state = userStates[userId];
     if (!state) return;
     state.method = ctx.match[1].toUpperCase();
@@ -379,26 +380,28 @@ bot.action(/^reject_wit_(\d+)_([\d.]+)$/, async (ctx) => {
     }
 });
 
-bot.on('text', async (ctx, next) => {
-    const userId = ctx.from.id;
-    const text = ctx.message.text;
-    const state = userStates[userId];
+// 🛡️ BATTLE-TESTED TEXT HANDLER
+bot.on('message', async (ctx) => {
+    try {
+        if (!ctx.message || !ctx.message.text) return;
+        const userId = String(ctx.from.id);
+        const text = ctx.message.text.trim();
+        const state = userStates[userId];
 
-    let user = await User.findOne({ id: String(userId) });
-    if (user && user.isBanned) return; 
+        let user = await User.findOne({ id: userId });
+        if (user && user.isBanned) return; 
 
-    if (state && state.action === 'admin_add1') {
-        state.targetId = text.trim();
-        state.action = 'admin_add2';
-        return ctx.reply(`User ID saved: \`${state.targetId}\`\n👇 *Enter amount of X Coins to ADD:*`, {parse_mode: 'Markdown'});
-    }
-    if (state && state.action === 'admin_add2') {
-        const amount = parseFloat(text);
-        if (isNaN(amount) || amount <= 0) {
-            delete userStates[userId];
-            return ctx.reply("❌ Invalid amount. Operation cancelled.");
+        if (state && state.action === 'admin_add1') {
+            state.targetId = text;
+            state.action = 'admin_add2';
+            return ctx.reply(`User ID saved: \`${state.targetId}\`\n👇 *Enter amount of X Coins to ADD:*`, {parse_mode: 'Markdown'});
         }
-        try {
+        if (state && state.action === 'admin_add2') {
+            const amount = parseFloat(text);
+            if (isNaN(amount) || amount <= 0) {
+                delete userStates[userId];
+                return ctx.reply("❌ Invalid amount. Operation cancelled.");
+            }
             let u = await User.findOne({id: state.targetId});
             if(!u) {
                 delete userStates[userId];
@@ -408,23 +411,21 @@ bot.on('text', async (ctx, next) => {
             await u.save();
             ctx.reply(`✅ *Success!*\nAdded ${amount} X Coins ($${(amount/100).toFixed(2)}) to ${u.name}.\nNew Balance:${u.balance} Coins`, {parse_mode: 'Markdown'});
             bot.telegram.sendMessage(state.targetId, `🎁 *Admin Reward:* You received *${amount} X Coins ($${(amount/100).toFixed(2)})*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
-        } catch(e) { ctx.reply("❌ Error."); }
-        delete userStates[userId];
-        return;
-    }
-
-    if (state && state.action === 'admin_rem1') {
-        state.targetId = text.trim();
-        state.action = 'admin_rem2';
-        return ctx.reply(`User ID saved: \`${state.targetId}\`\n👇 *Enter amount of X Coins to REMOVE:*`, {parse_mode: 'Markdown'});
-    }
-    if (state && state.action === 'admin_rem2') {
-        const amount = parseFloat(text);
-        if (isNaN(amount) || amount <= 0) {
             delete userStates[userId];
-            return ctx.reply("❌ Invalid amount. Operation cancelled.");
+            return;
         }
-        try {
+
+        if (state && state.action === 'admin_rem1') {
+            state.targetId = text;
+            state.action = 'admin_rem2';
+            return ctx.reply(`User ID saved: \`${state.targetId}\`\n👇 *Enter amount of X Coins to REMOVE:*`, {parse_mode: 'Markdown'});
+        }
+        if (state && state.action === 'admin_rem2') {
+            const amount = parseFloat(text);
+            if (isNaN(amount) || amount <= 0) {
+                delete userStates[userId];
+                return ctx.reply("❌ Invalid amount. Operation cancelled.");
+            }
             let u = await User.findOne({id: state.targetId});
             if(!u) {
                 delete userStates[userId];
@@ -433,101 +434,103 @@ bot.on('text', async (ctx, next) => {
             u.balance = Math.max(0, u.balance - amount); 
             await u.save();
             ctx.reply(`✅ *Success!*\nRemoved ${amount} X Coins from ${u.name}.\nNew Balance:${u.balance} Coins`, {parse_mode: 'Markdown'});
-        } catch(e) { ctx.reply("❌ Error."); }
-        delete userStates[userId];
-        return;
-    }
-
-    if (state && state.action === 'register' && state.step === 'awaiting_country_name') {
-        if (!user) user = new User({ id: String(userId), name: ctx.from.first_name, country: text.trim(), language: 'en' });
-        else { user.country = text.trim(); user.language = 'en'; }
-        await user.save();
-        delete userStates[userId];
-        return sendWelcomeAndMenu(ctx, user);
-    }
-    
-    if (user && !user.country) return ctx.reply("⚠️ Complete setup using /start");
-    
-    if (['🎮 Play CheckerX', '💰 Balance', '📥 Deposit', '📤 Withdrawal', '🔗 Referral', '💬 Support'].includes(text)) {
-        delete userStates[userId];
-        return next();
-    }
-    if (!state) return next();
-
-    if (state.action === 'deposit' && state.step === 'awaiting_amount') {
-        const amount = parseFloat(text);
-        if (isNaN(amount) || amount < 2.0) {
-            return ctx.reply("⚠️ *Error:* Minimum deposit is $2.00. Please enter a valid number (e.g., 2, 5, 10):", { parse_mode: 'Markdown' });
-        }
-        state.amount = amount; 
-        state.step = 'awaiting_txid';
-        
-        let idType = state.method === 'BINANCE' ? '*Binance Pay ID / Email*' : '*TxID (Transaction Hash)*';
-        return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}* (${state.amount * 100} X Coins)\n\n3️⃣ *Now, paste your ${idType} below to verify your payment:*\n\n_📞 If you have any issues, contact @CheckerX_Admin_`);
-    }
-
-    if (state.action === 'deposit' && state.step === 'awaiting_txid') {
-        const adminMsg = `📥 *NEW DEPOSIT* (${state.method}) 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount} (${state.amount * 100} Coins)\n🔗 *TxID:* \`${text}\``;
-        
-        bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '✅ Approve Deposit', callback_data: `approve_dep_${user.id}_${state.amount}` }],
-                    [{ text: '❌ Reject', callback_data: `reject_dep_${user.id}` }],
-                    [{ text: '💬 Contact User', url: `tg://user?id=${user.id}` }]
-                ]
-            }
-        }).catch(e=>{});
-        
-        ctx.replyWithMarkdown("✅ *Deposit Submitted Successfully!* Admins will verify your transaction shortly.");
-        delete userStates[userId]; 
-        return;
-    }
-
-    if (state.action === 'withdraw' && state.step === 'awaiting_amount') {
-        const amount = parseFloat(text);
-        if (isNaN(amount) || amount < 300) {
-            return ctx.reply("⚠️ *Error:* Minimum withdrawal is 300 X Coins ($3.00). Please enter a valid number:", { parse_mode: 'Markdown' });
-        }
-        if (amount > user.balance) {
-            return ctx.reply(`❌ *Insufficient Balance!* You only have ${user.balance} X Coins ($${(user.balance/100).toFixed(2)}).`, { parse_mode: 'Markdown' });
-        }
-        state.amount = amount; 
-        state.step = 'awaiting_method';
-        return ctx.reply("💳 Select withdrawal method:", Markup.inlineKeyboard([
-            [Markup.button.callback('🔶 Binance', 'with_binance'), Markup.button.callback('💵 USDT', 'with_usdt')],
-            [Markup.button.callback('🔴 TRX', 'with_trx'), Markup.button.callback('🪙 DGB', 'with_dgb')]
-        ]));
-    }
-
-    if (state.action === 'withdraw' && state.step === 'awaiting_address') {
-        if (user.balance < state.amount) {
             delete userStates[userId];
-            return ctx.reply("❌ *Error:* Balance changed. Withdrawal cancelled.", { parse_mode: 'Markdown' });
+            return;
         }
-        user.balance -= state.amount; 
-        await user.save();
+
+        if (state && state.action === 'register' && state.step === 'awaiting_country_name') {
+            if (!user) user = new User({ id: userId, name: ctx.from.first_name, country: text, language: 'en' });
+            else { user.country = text; user.language = 'en'; }
+            await user.save();
+            delete userStates[userId];
+            return sendWelcomeAndMenu(ctx, user);
+        }
         
-        const usdVal = (state.amount / 100).toFixed(2);
-        const adminMsg = `📤 *NEW WITHDRAWAL* (${state.method}) 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💰 *Avail. Bal:* \`${user.balance} Coins ($${(user.balance/100).toFixed(2)})\`\n💸 *Req. Amt:* ${state.amount} Coins ($${usdVal})\n📍 *Addr:* \`${text}\``;
+        if (user && !user.country) return ctx.reply("⚠️ Complete setup using /start");
         
-        bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '✅ Mark as Paid', callback_data: `approve_wit_${user.id}_${state.amount}` }],
-                    [{ text: '❌ Reject & Refund', callback_data: `reject_wit_${user.id}_${state.amount}` }],
-                    [{ text: '💬 Contact User', url: `tg://user?id=${user.id}` }]
-                ]
+        if (['🎮 Play CheckerX', '💰 Balance', '📥 Deposit', '📤 Withdrawal', '🔗 Referral', '💬 Support'].includes(text)) {
+            delete userStates[userId];
+            return; 
+        }
+        
+        if (!state) return;
+
+        if (state.action === 'deposit' && state.step === 'awaiting_amount') {
+            const amount = parseFloat(text);
+            if (isNaN(amount) || amount < 2.0) {
+                return ctx.reply("⚠️ *Error:* Minimum deposit is $2.00. Please enter a valid number (e.g., 2, 5, 10):", { parse_mode: 'Markdown' });
             }
-        }).catch(e=>{});
-        
-        ctx.replyWithMarkdown(`✅ *Withdrawal Request Submitted!* New Balance: ${user.balance} X Coins ($${(user.balance/100).toFixed(2)})`);
-        delete userStates[userId]; 
-        return;
+            state.amount = amount; 
+            state.step = 'awaiting_txid';
+            
+            let idType = state.method === 'BINANCE' ? '*Binance Pay ID / Email*' : '*TxID (Transaction Hash)*';
+            return ctx.replyWithMarkdown(`✅ Amount saved: *$${state.amount}* (${state.amount * 100} X Coins)\n\n3️⃣ *Now, paste your ${idType} below to verify your payment:*\n\n_📞 If you have any issues, contact @CheckerX_Admin_`);
+        }
+
+        if (state.action === 'deposit' && state.step === 'awaiting_txid') {
+            const adminMsg = `📥 *NEW DEPOSIT* (${state.method}) 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount} (${state.amount * 100} Coins)\n🔗 *TxID:* \`${text}\``;
+            
+            bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '✅ Approve Deposit', callback_data: `approve_dep_${user.id}_${state.amount}` }],
+                        [{ text: '❌ Reject', callback_data: `reject_dep_${user.id}` }],
+                        [{ text: '💬 Contact User', url: `tg://user?id=${user.id}` }]
+                    ]
+                }
+            }).catch(e=>{});
+            
+            ctx.replyWithMarkdown("✅ *Deposit Submitted Successfully!* Admins will verify your transaction shortly.");
+            delete userStates[userId]; 
+            return;
+        }
+
+        if (state.action === 'withdraw' && state.step === 'awaiting_amount') {
+            const amount = parseFloat(text);
+            if (isNaN(amount) || amount < 300) {
+                return ctx.reply("⚠️ *Error:* Minimum withdrawal is 300 X Coins ($3.00). Please enter a valid number:", { parse_mode: 'Markdown' });
+            }
+            if (amount > user.balance) {
+                return ctx.reply(`❌ *Insufficient Balance!* You only have ${user.balance} X Coins ($${(user.balance/100).toFixed(2)}).`, { parse_mode: 'Markdown' });
+            }
+            state.amount = amount; 
+            state.step = 'awaiting_method';
+            return ctx.reply("💳 Select withdrawal method:", Markup.inlineKeyboard([
+                [Markup.button.callback('🔶 Binance', 'with_binance'), Markup.button.callback('💵 USDT', 'with_usdt')],
+                [Markup.button.callback('🔴 TRX', 'with_trx'), Markup.button.callback('🪙 DGB', 'with_dgb')]
+            ]));
+        }
+
+        if (state.action === 'withdraw' && state.step === 'awaiting_address') {
+            if (user.balance < state.amount) {
+                delete userStates[userId];
+                return ctx.reply("❌ *Error:* Balance changed. Withdrawal cancelled.", { parse_mode: 'Markdown' });
+            }
+            user.balance -= state.amount; 
+            await user.save();
+            
+            const usdVal = (state.amount / 100).toFixed(2);
+            const adminMsg = `📤 *NEW WITHDRAWAL* (${state.method}) 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💰 *Avail. Bal:* \`${user.balance} Coins ($${(user.balance/100).toFixed(2)})\`\n💸 *Req. Amt:* ${state.amount} Coins ($${usdVal})\n📍 *Addr:* \`${text}\``;
+            
+            bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '✅ Mark as Paid', callback_data: `approve_wit_${user.id}_${state.amount}` }],
+                        [{ text: '❌ Reject & Refund', callback_data: `reject_wit_${user.id}_${state.amount}` }],
+                        [{ text: '💬 Contact User', url: `tg://user?id=${user.id}` }]
+                    ]
+                }
+            }).catch(e=>{});
+            
+            ctx.replyWithMarkdown(`✅ *Withdrawal Request Submitted!* New Balance: ${user.balance} X Coins ($${(user.balance/100).toFixed(2)})`);
+            delete userStates[userId]; 
+            return;
+        }
+    } catch (error) {
+        console.error("Critical error in message handler:", error);
     }
-    return next();
 });
 
 bot.launch().then(() => console.log("Bot launched!")).catch((err) => console.error("Bot Error:", err.message));
