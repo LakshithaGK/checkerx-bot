@@ -223,13 +223,13 @@
         </div>
     </div>
 
-    <!-- 🟢 UPDATED: Rules Modal with Highlighted Flying King Rule -->
+    <!-- Rules Modal -->
     <div id="rulesModal" class="modal">
         <div class="modal-content">
             <h3 style="color: #00f2fe; font-family: 'Orbitron'; margin-top:0;">📜 PRO RULES</h3>
             <ul class="rules-list" style="color: #c9d1d9; line-height: 1.4; padding-left: 15px;">
                 <li><b>1. Majority Capture:</b> You must choose the path that captures the maximum number of pieces.</li>
-                <li style="color: #f1c40f; background: rgba(241, 196, 15, 0.15); padding: 8px; border-radius: 6px; border-left: 3px solid #f1c40f; margin: 8px 0; font-size: 12px;"><b>👑 Special Flying King:</b> Kings can move and capture across multiple empty squares diagonally!</li>
+                <li style="color: #f1c40f; background: rgba(241, 196, 15, 0.15); padding: 8px; border-radius: 6px; border-left: 3px solid #f1c40f; margin: 8px 0; font-size: 12px;"><b>👑 Special Flying King:</b> Kings move across empty squares, but must land on the square immediately after the last captured piece!</li>
                 <li><b>3. Turn Timer:</b> 30 seconds limit per turn. Missing 2 turns causes automatic forfeiture.</li>
                 <li><b>4. Disconnect Loss:</b> Closing browser tab or network drop results in immediate match defeat.</li>
                 <li><b>5. Profit Rate:</b> Winner receives 80% net profit (180% return on stake).</li>
@@ -824,7 +824,7 @@
                 dirs.forEach(([dr, dc]) => {
                     if (!p.isKing) {
                         let nr = r+dr, nc = c+dc;
-                        if(nr>=0 && nr<8 && nc>=0 && nc<8 && !boardState[nr][nc]) legalMoves.push({ r: nr, c: nc });
+                        if(nr>=0 && nr<8 && nc>=0 && nc<8 && !boardState[nr][nr] && !boardState[nr][nc]) legalMoves.push({ r: nr, c: nc });
                     } else {
                         let s = 1;
                         while(true) {

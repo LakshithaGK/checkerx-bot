@@ -137,8 +137,7 @@ async function sendWelcomeAndMenu(ctx, user) {
         await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
     } catch (error) {}
 
-    // 🟢 UPDATED: Highlighted Flying King Rule
-    const rulesMsg = `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 👑 *FLYING KING:* Kings can move and capture across multiple empty squares diagonally!\n3. 30s Timeout = Loss.\n4. Winner receives 80% profit.\n5. Match Draw: If 1 King vs 1 King left.\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*\n\n🌐 *Join our World Chat:* Meet players, share your match links, and get support!`;
+    const rulesMsg = `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 👑 *FLYING KING:* Kings move across empty squares, but must land immediately after the last captured piece!\n3. 30s Timeout = Loss.\n4. Winner receives 80% profit.\n5. Match Draw: If 1 King vs 1 King left.\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*\n\n🌐 *Join our World Chat:* Meet players, share your match links, and get support!`;
     
     await ctx.replyWithMarkdown(rulesMsg, Markup.inlineKeyboard([
         [Markup.button.url('💬 Join World Chat Group', 'https://t.me/CheckerX_Support')]
@@ -236,7 +235,7 @@ bot.action(/^with_([a-zA-Z_]+)$/, async (ctx) => {
     await ctx.answerCbQuery();
     
     let promptMsg = state.method === 'BINANCE' 
-        ? '📍 *After do transection to above pay id , paste your Binance Pay ID or Binance Email below:*' 
+        ? '📍 *Paste your Binance Pay ID or Binance Email below:*' 
         : `📍 *Paste your ${state.method} TRC20 Wallet Address below (Make sure it is TRC20 network):*`;
         
     ctx.replyWithMarkdown(`🏦 *${state.method} Selected*\n\n${promptMsg}`);
