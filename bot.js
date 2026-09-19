@@ -176,7 +176,7 @@ bot.hears('💰 Balance', async (ctx) => {
     const totalMatches = user.wins + user.losses;
     const winRate = totalMatches > 0 ? Math.round((user.wins / totalMatches) * 100) : 0;
     const usdVal = (user.balance / 100).toFixed(2);
-    const balanceMsg = `🏦 *CHECKERX WALLET* 🏦\n━━━━━━━━━━━━━━━━━━\n👤 *User:* ${user.name}\n💰 *Balance:* \`${user.balance.toLocaleString()} X Coins ($${usdVal})\`\n🏆 *Win Rate:* ${winRate}% (${user.wins}W / ${user.losses}L / ${user.draws || 0}D)\n━━━━━━━━━━━━━━━━━━`;
+    const balanceMsg = `🏦 *CHECKERX WALLET* 🏦\n━━━━━━━━━━━━━━━━━━\n👤 *User:* ${user.name}\n💰 *Balance:* \`${user.balance.toLocaleString()} X Coins ($${usdVal})\`\n🏆 *Win Rate:* ${winRate}\% (${user.wins}W / ${user.losses}L / ${user.draws || 0}D)\n━━━━━━━━━━━━━━━━━━`;
     ctx.replyWithMarkdown(balanceMsg);
 });
 
@@ -206,7 +206,7 @@ bot.action(/^dep_([a-zA-Z_]+)$/, async (ctx) => {
         address = 'DGB Wallet Address:\n`Your_DGB_Wallet_Address_Here`';
     }
 
-    userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount', address: address };
+    userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount' };
     await ctx.answerCbQuery();
     ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\n1️⃣ *Make your payment to:*\n${address}\n\n2️⃣ *How much are you depositing? (Min $2.00)*\n_(Type the amount below)_`);
 });
@@ -305,7 +305,7 @@ bot.action('admin_top_refs', async (ctx) => {
             const count = refCounts[refId];
             const refUser = await User.findOne({ id: refId });
             const name = refUser ? refUser.name : "Unknown";
-            msg += `${i + 1}. ${name} (\`${refId}\`) - *${count} Refs*\n`;
+            msg += `${i + 1}.${name} (\`${refId}\`) - *${count} Refs*\n`;
         }
         msg += `━━━━━━━━━━━━━━`;
         ctx.replyWithMarkdown(msg);
@@ -406,7 +406,7 @@ bot.on('text', async (ctx, next) => {
             }
             u.balance += amount; 
             await u.save();
-            ctx.reply(`✅ *Success!*\nAdded ${amount} X Coins ($${(amount/100).toFixed(2)}) to ${u.name}.\nNew Balance: ${u.balance} Coins`, {parse_mode: 'Markdown'});
+            ctx.reply(`✅ *Success!*\nAdded ${amount} X Coins ($${(amount/100).toFixed(2)}) to ${u.name}.\nNew Balance:${u.balance} Coins`, {parse_mode: 'Markdown'});
             bot.telegram.sendMessage(state.targetId, `🎁 *Admin Reward:* You received *${amount} X Coins ($${(amount/100).toFixed(2)})*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
         } catch(e) { ctx.reply("❌ Error."); }
         delete userStates[userId];
@@ -432,7 +432,7 @@ bot.on('text', async (ctx, next) => {
             }
             u.balance = Math.max(0, u.balance - amount); 
             await u.save();
-            ctx.reply(`✅ *Success!*\nRemoved ${amount} X Coins from ${u.name}.\nNew Balance: ${u.balance} Coins`, {parse_mode: 'Markdown'});
+            ctx.reply(`✅ *Success!*\nRemoved ${amount} X Coins from ${u.name}.\nNew Balance:${u.balance} Coins`, {parse_mode: 'Markdown'});
         } catch(e) { ctx.reply("❌ Error."); }
         delete userStates[userId];
         return;
