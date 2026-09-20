@@ -200,11 +200,11 @@ bot.action(/^dep_([a-zA-Z_]+)$/, async (ctx) => {
     let address = '';
     
     if (method === 'BINANCE') {
-        address = 'Binance Pay ID: `123456789`'; 
+        address = 'Binance Pay ID: `68831633`'; 
     } else if (method === 'USDT' || method === 'TRX') {
-        address = 'TRC20 Wallet Address:\n`Your_TRC20_Wallet_Address_Here`';
+        address = 'TRC20 Wallet Address:\n`TFMcoaR7zC1NV94FBnP5JXBcNg1BbxourK`';
     } else if (method === 'DGB') {
-        address = 'DGB Wallet Address:\n`Your_DGB_Wallet_Address_Here`';
+        address = 'DGB Wallet Address:\n`DL4wmug1kCrAXA3PRHrAhwvs3wzF53HniH`';
     }
 
     userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount' };
