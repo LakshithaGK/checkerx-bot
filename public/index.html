@@ -79,6 +79,10 @@
 
         .earner-item { display: flex; justify-content: space-between; align-items: center; background: rgba(22, 27, 34, 0.8); border: 1px solid #30363d; padding: 8px 12px; border-radius: 10px; margin-bottom: 6px; font-size: 12px; }
         .earner-rank { font-weight: bold; font-family: 'Orbitron'; color: #f1c40f; width: 25px; }
+
+        /* Telegram Channel Quick Button Style */
+        .tg-channel-btn { background: rgba(0, 242, 254, 0.1); border: 1px solid #00f2fe; color: #00f2fe; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; text-decoration: none; transition: 0.2s; }
+        .tg-channel-btn:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
@@ -95,9 +99,15 @@
                 </div>
             </div>
         </div>
-        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
-            <div class="balance-pill">💰 <span id="userBalance">0</span> X Coins<br><span id="userBalanceUSD" style="font-size: 10px; color: #8b949e;">($0.00)</span></div>
-            <div class="winrate-badge" id="winRateBadge">🏆 Win: 0%</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <!-- Telegram Channel Quick Button with Icon -->
+            <button class="tg-channel-btn" onclick="openTelegramChannel()">
+                <span>📢</span> Channel
+            </button>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                <div class="balance-pill">💰 <span id="userBalance">0</span> X Coins<br><span id="userBalanceUSD" style="font-size: 10px; color: #8b949e;">($0.00)</span></div>
+                <div class="winrate-badge" id="winRateBadge">🏆 Win: 0%</div>
+            </div>
         </div>
     </div>
 
@@ -108,6 +118,7 @@
         
         <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 FIND MATCH</button>
         <button class="btn-primary" style="background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000;" onclick="openRoomStakeMenu()">👥 CREATE ROOM</button>
+        <button class="btn-primary" style="background: linear-gradient(135deg, #2ea043, #238636); color: #fff;" onclick="openReferralModal()">🤝 REFERRAL PROGRAM</button>
         <button class="btn-secondary" style="border-color:#f1c40f; color:#f1c40f;" onclick="openTopEarnersModal()">🏆 TOP EARNERS LIST</button>
         <button class="btn-secondary" onclick="document.getElementById('rulesModal').style.display='flex'">📜 GAME RULES</button>
 
@@ -218,6 +229,33 @@
             <button class="btn-primary" style="background: transparent; color: #f1c40f; border: 2px solid #f1c40f; box-shadow: none; margin-top: 15px;" onclick="document.getElementById('topEarnersModal').style.display='none'">CLOSE</button>
         </div>
     </div>
+
+    <!-- REFERRAL PROGRAM MODAL -->
+    <div id="referralModal" class="modal">
+        <div class="modal-content" style="border-color: #2ea043; box-shadow: 0 10px 40px rgba(46,160,67,0.2);">
+            <h2 style="font-family: 'Orbitron'; color: #2ea043; margin-top:0; font-size: 18px;">🤝 REFERRAL PROGRAM</h2>
+            <p style="color: #8b949e; font-size: 11px; margin-bottom: 15px;">Invite friends and earn bonuses!</p>
+            
+            <div style="background: rgba(22, 27, 34, 0.9); border: 1px solid #30363d; padding: 12px; border-radius: 12px; margin-bottom: 15px; text-align: left; font-size: 12px;">
+                <div style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+                    <span>👥 Total Referrals:</span>
+                    <b id="totalRefVal" style="color: #00f2fe; font-family: 'Roboto Mono';">0</b>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>🔥 Verified Referrals (First Deposit):</span>
+                    <b id="verifiedRefVal" style="color: #2ea043; font-family: 'Roboto Mono';">0</b>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px; text-align: left;">
+                <label style="font-size: 11px; color: #8b949e; display: block; margin-bottom: 4px;">Your Invite Link:</label>
+                <input type="text" id="refLinkInput" readonly style="width: 100%; background: #0b0e14; border: 1px solid #30363d; color: #00f2fe; padding: 8px; border-radius: 8px; font-size: 11px; font-family: 'Roboto Mono';" value="Loading...">
+            </div>
+
+            <button class="btn-primary" style="background: linear-gradient(135deg, #2ea043, #238636); color: #fff; margin-top: 0;" onclick="shareReferralLink()">📤 SHARE LINK</button>
+            <button class="btn-primary" style="background: transparent; color: #2ea043; border: 2px solid #2ea043; box-shadow: none; margin-top: 8px;" onclick="document.getElementById('referralModal').style.display='none'">CLOSE</button>
+        </div>
+    </div>
     
     <!-- Custom UI Notification Modal -->
     <div id="customAlertModal" class="modal">
@@ -255,6 +293,39 @@
         let userBalance = 0;
         let currentMatchStake = 100;
         let currentMatchPrize = 180;
+
+        // Telegram Channel Link Function
+        function openTelegramChannel() {
+            if (tg && tg.openTelegramLink) {
+                tg.openTelegramLink('https://t.me/checker_x_community');
+            } else {
+                window.open('https://t.me/checker_x_community', '_blank');
+            }
+        }
+
+        // Referral Modal Logic
+        function openReferralModal() {
+            document.getElementById('referralModal').style.display = 'flex';
+            const botUsername = 'CheckerX_Official_Bot';
+            const refLink = `https://t.me/${botUsername}?start=ref_${tgUser.id}`;
+            document.getElementById('refLinkInput').value = refLink;
+            socket.emit('get_referral_stats', { userId: tgUser.id });
+        }
+
+        function shareReferralLink() {
+            const refLink = document.getElementById('refLinkInput').value;
+            const shareText = `🎮 Play 1vs1 Checkers on CheckerX and win crypto! Join using my link:`;
+            if (tg && tg.openTelegramLink) {
+                tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`);
+            } else {
+                window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`, '_blank');
+            }
+        }
+
+        socket.on('referral_stats_res', (data) => {
+            document.getElementById('totalRefVal').innerText = data.total || 0;
+            document.getElementById('verifiedRefVal').innerText = data.verified || 0;
+        });
 
         // Profile Avatar Logic
         let avatarUrl = tgUser?.photo_url ? tgUser.photo_url : `https://ui-avatars.com/api/?name=${encodeURIComponent(myName)}&background=00f2fe&color=000&bold=true`;

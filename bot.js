@@ -75,7 +75,14 @@ const userStates = {};
 bot.start(async (ctx) => {
     const userId = String(ctx.from.id);
     const payload = ctx.startPayload;
-    let referrerId = (payload && !payload.startsWith('room_')) ? payload : null;
+    
+    // Check if referral link is used (e.g., start=ref_123456)
+    let referrerId = null;
+    if (payload && payload.startsWith('ref_')) {
+        referrerId = payload.split('_')[1];
+    } else if (payload && !payload.startsWith('room_')) {
+        referrerId = payload;
+    }
 
     let user = await getUser(userId, ctx.from.first_name, referrerId);
     
@@ -140,7 +147,7 @@ async function sendWelcomeAndMenu(ctx, user) {
     const rulesMsg = `📜 *CheckerX Pro Rules:*\n1. Majority capture is mandatory.\n2. 👑 *FLYING KING:* Kings move across empty squares, but must land immediately after the last captured piece!\n3. 30s Timeout = Loss.\n4. Winner receives 80% profit.\n5. Match Draw: 20-move limit activates when 1 vs 1 piece remains.\n\n🎁 *You received 20 X Coins ($0.20) Welcome Bonus!*\n\n🌐 *Join our World Chat:* Meet players, share your match links, and get support!`;
     
     await ctx.replyWithMarkdown(rulesMsg, Markup.inlineKeyboard([
-        [Markup.button.url('💬 Join World Chat Group', 'https://t.me/CheckerX_Support')]
+        [Markup.button.url('💬 Join World Chat Group', 'https://t.me/checker_x_community')]
     ]));
 
     sendMainMenu(ctx, user);
@@ -167,7 +174,7 @@ bot.hears('🔗 Referral', async (ctx) => {
     const user = await User.findOne({ id: String(ctx.from.id) });
     if (user && user.isBanned) return;
     const botUsername = 'CheckerX_Official_Bot';
-    ctx.replyWithMarkdown(`🔗 *REFERRAL PROGRAM*\nInvite friends and earn *10 X Coins ($0.10)* when they make their first successful deposit ($2+ min)!\n\n👇 *Your Referral Link:*\n\`https://t.me/${botUsername}?start=${ctx.from.id}\``);
+    ctx.replyWithMarkdown(`🔗 *REFERRAL PROGRAM*\nInvite friends and earn *10 X Coins ($0.10)* when they make their first successful deposit ($2+ min)!\n\n👇 *Your Referral Link:*\n\`https://t.me/${botUsername}?start=ref_${ctx.from.id}\``);
 });
 
 bot.hears('💰 Balance', async (ctx) => {
@@ -563,6 +570,26 @@ io.on('connection', (socket) => {
 
             socket.emit('user_synced', { balance: user.balance, name: user.name, winRate, history: user.history });
         } catch (e) {}
+    });
+
+    // ==========================================
+    // 🆕 REFERRAL STATS SYSTEM
+    // ==========================================
+    socket.on('get_referral_stats', async (data) => {
+        try {
+            if (!data || !data.userId) return;
+            
+            // Count total people who joined using this user's link
+            const total = await User.countDocuments({ referredBy: String(data.userId) });
+            
+            // Count people who made their first deposit (verified referrals)
+            const verified = await User.countDocuments({ referredBy: String(data.userId), firstDepositDone: true });
+            
+            // Send data back to the frontend
+            socket.emit('referral_stats_res', { total, verified });
+        } catch (e) {
+            console.error("Error fetching referral stats:", e);
+        }
     });
 
     socket.on('get_top_earners', async () => {
