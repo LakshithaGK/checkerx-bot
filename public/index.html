@@ -118,7 +118,8 @@
         
         <button class="btn-primary" onclick="navTo('stakeScreen')">🎮 FIND MATCH</button>
         <button class="btn-primary" style="background: linear-gradient(135deg, #f1c40f, #e67e22); color: #000;" onclick="openRoomStakeMenu()">👥 CREATE ROOM</button>
-        <button class="btn-primary" style="background: linear-gradient(135deg, #2ea043, #238636); color: #fff;" onclick="openReferralModal()">🤝 REFERRAL PROGRAM</button>
+        <!-- Updated Referral Button to show stats -->
+        <button class="btn-primary" style="background: linear-gradient(135deg, #2ea043, #238636); color: #fff; font-size: 13px;" onclick="openReferralModal()">🤝 REFERRALS (Tot: <span id="btnTotalRef">0</span> | Ver: <span id="btnVerifiedRef">0</span>)</button>
         <button class="btn-secondary" style="border-color:#f1c40f; color:#f1c40f;" onclick="openTopEarnersModal()">🏆 TOP EARNERS LIST</button>
         <button class="btn-secondary" onclick="document.getElementById('rulesModal').style.display='flex'">📜 GAME RULES</button>
 
@@ -323,8 +324,15 @@
         }
 
         socket.on('referral_stats_res', (data) => {
+            // Update the values inside the Modal
             document.getElementById('totalRefVal').innerText = data.total || 0;
             document.getElementById('verifiedRefVal').innerText = data.verified || 0;
+            
+            // Update the Home Screen Button instantly
+            const btnTot = document.getElementById('btnTotalRef');
+            const btnVer = document.getElementById('btnVerifiedRef');
+            if (btnTot) btnTot.innerText = data.total || 0;
+            if (btnVer) btnVer.innerText = data.verified || 0;
         });
 
         // Profile Avatar Logic
@@ -353,6 +361,9 @@
         const ctx = canvas ? canvas.getContext('2d') : null;
 
         socket.emit('init_user', tgUser);
+        
+        // Fetch Referral Stats immediately when app loads to display on the home screen button
+        socket.emit('get_referral_stats', { userId: tgUser.id });
 
         function showNotification(title, message) {
             document.getElementById('alertTitle').innerText = title;
