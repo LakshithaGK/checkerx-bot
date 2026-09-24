@@ -170,11 +170,20 @@ bot.hears('🎮 Play CheckerX', async (ctx) => {
     ctx.replyWithMarkdown('👇 Click the *Play CheckerX* button at bottom left to play!');
 });
 
+// ✅ UPDATE: Add Total and Verified Referrals to the bot message
 bot.hears('🔗 Referral', async (ctx) => {
-    const user = await User.findOne({ id: String(ctx.from.id) });
+    const userId = String(ctx.from.id);
+    const user = await User.findOne({ id: userId });
     if (user && user.isBanned) return;
+    
+    // Get stats from database
+    const totalRefs = await User.countDocuments({ referredBy: userId });
+    const verifiedRefs = await User.countDocuments({ referredBy: userId, firstDepositDone: true });
+    
     const botUsername = 'CheckerX_Official_Bot';
-    ctx.replyWithMarkdown(`🔗 *REFERRAL PROGRAM*\nInvite friends and earn *10 X Coins ($0.10)* when they make their first successful deposit ($2+ min)!\n\n👇 *Your Referral Link:*\n\`https://t.me/${botUsername}?start=ref_${ctx.from.id}\``);
+    const msg = `🔗 *REFERRAL PROGRAM*\nInvite friends and earn *10 X Coins ($0.10)* when they make their first successful deposit ($2+ min)!\n\n📊 *Your Stats:*\n👥 Total Referrals: *${totalRefs}*\n🔥 Verified (Deposited): *${verifiedRefs}*\n\n👇 *Your Referral Link:*\n\`https://t.me/${botUsername}?start=ref_${userId}\``;
+    
+    ctx.replyWithMarkdown(msg);
 });
 
 bot.hears('💰 Balance', async (ctx) => {
@@ -461,7 +470,6 @@ bot.on('message', async (ctx) => {
         
         if (!state) return;
 
-        // FIXED MARKDOWN PARSING ISSUE HERE!
         if (state.action === 'deposit' && state.step === 'awaiting_amount') {
             const amount = parseFloat(text);
             if (isNaN(amount) || amount < 2.0) {
@@ -572,20 +580,11 @@ io.on('connection', (socket) => {
         } catch (e) {}
     });
 
-    // ==========================================
-    // 🆕 REFERRAL STATS SYSTEM
-    // ==========================================
     socket.on('get_referral_stats', async (data) => {
         try {
             if (!data || !data.userId) return;
-            
-            // Count total people who joined using this user's link
             const total = await User.countDocuments({ referredBy: String(data.userId) });
-            
-            // Count people who made their first deposit (verified referrals)
             const verified = await User.countDocuments({ referredBy: String(data.userId), firstDepositDone: true });
-            
-            // Send data back to the frontend
             socket.emit('referral_stats_res', { total, verified });
         } catch (e) {
             console.error("Error fetching referral stats:", e);
