@@ -82,7 +82,6 @@ bot.start(async (ctx) => {
     const userId = String(ctx.from.id);
     const payload = ctx.startPayload;
     
-    // Check if referral link is used (e.g., start=ref_123456)
     let referrerId = null;
     if (payload && payload.startsWith('ref_')) {
         referrerId = payload.split('_')[1];
@@ -177,7 +176,6 @@ bot.hears('🎮 Play CheckerX', async (ctx) => {
     ctx.replyWithMarkdown('👇 Click the *Play CheckerX* button at bottom left to play!');
 });
 
-// ✅ UPDATE: Removed ($2+ min) from Referral message
 bot.hears('🔗 Referral', async (ctx) => {
     const userId = String(ctx.from.id);
     const user = await User.findOne({ id: userId });
@@ -218,7 +216,6 @@ bot.hears('📥 Deposit', async (ctx) => {
     });
 });
 
-// ✅ UPDATE: Deposit Flow Step 1 (Ask amount only)
 bot.action(/^dep_([a-zA-Z_]+)$/, async (ctx) => {
     const method = ctx.match[1].toUpperCase();
     const userId = String(ctx.from.id);
@@ -472,7 +469,7 @@ bot.on('message', async (ctx) => {
         
         if (!state) return;
 
-        // ✅ UPDATE: Deposit Flow Step 2 (Send Address and ask for TxID)
+        // ✅ UPDATE: Deposit Flow Step 2 (Better Copy & Instructions)
         if (state.action === 'deposit' && state.step === 'awaiting_amount') {
             const amount = parseFloat(text);
             if (isNaN(amount) || amount < 2.0) {
@@ -481,18 +478,18 @@ bot.on('message', async (ctx) => {
             state.amount = amount; 
             state.step = 'awaiting_txid';
             
-            let address = '';
+            let addressText = '';
             if (state.method === 'BINANCE') {
-                address = 'Binance Pay ID: 68831633'; 
+                addressText = '<b>Binance Pay ID:</b>\n<code>68831633</code>'; 
             } else if (state.method === 'USDT' || state.method === 'TRX') {
-                address = 'TRC20 Wallet Address:\nTFMcoaR7zC1NV94FBnP5JXBcNg1BbxourK';
+                addressText = '<b>TRC20 Wallet Address:</b>\n<code>TFMcoaR7zC1NV94FBnP5JXBcNg1BbxourK</code>';
             } else if (state.method === 'DGB') {
-                address = 'DGB Wallet Address:\nDL4wmug1kCrAXA3PRHrAhwvs3wzF53HniH';
+                addressText = '<b>DGB Wallet Address:</b>\n<code>DL4wmug1kCrAXA3PRHrAhwvs3wzF53HniH</code>';
             }
 
-            let idType = state.method === 'BINANCE' ? 'Binance Pay ID / Email' : 'TxID (Transaction Hash)';
+            let idType = state.method === 'BINANCE' ? 'Binance Pay ID / Email / Reference' : 'Transaction ID / Hash';
             
-            let responseMsg = `✅ Amount saved: <b>$${state.amount}</b> (${state.amount * 100} X Coins)\n\n1️⃣ <b>Make your payment to:</b>\n<code>${address}</code>\n\n2️⃣ <b>Now, paste your ${idType} below to verify your payment:</b>\n\n📞 <i>If you have any issues, contact @CheckerX_Admin</i>`;
+            let responseMsg = `✅ Amount saved: <b>$${state.amount}</b> (${state.amount * 100} X Coins)\n\n1️⃣ <b>Make your payment to:</b>\n${addressText}\n\n2️⃣ <b>👉 <u>After doing the payment, send your ${idType} below:</u></b>\n\n📞 <i>If you have any issues, contact @CheckerX_Admin</i>`;
             
             return ctx.reply(responseMsg, { parse_mode: 'HTML' });
         }
