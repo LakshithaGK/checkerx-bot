@@ -47,6 +47,12 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
+// 🛠️ Telegram Markdown ක්‍රෑෂ් වීම වළක්වා ගැනීමට විශේෂ අකුරු ඉවත් කිරීම
+const escapeMD = (text) => {
+    if (!text) return 'Player';
+    return String(text).replace(/[_*`\[\]]/g, ' ');
+};
+
 async function getUser(id, name, referrerId = null) {
     const userId = String(id || 'guest');
     try {
@@ -140,7 +146,8 @@ bot.action(/country_(.+)/, async (ctx) => {
 async function sendWelcomeAndMenu(ctx, user) {
     try {
         const totalUsers = await User.countDocuments();
-        const adminMsg = `🚨 *New Player Joined!* 🚨\n\n👤 *Name:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n🌍 *Country:* ${user.country}\n\n📊 *Total Players:* ${totalUsers} 📈`;
+        const safeName = escapeMD(user.name);
+        const adminMsg = `🚨 *New Player Joined!* 🚨\n\n👤 *Name:* ${safeName}\n🆔 *ID:* \`${user.id}\`\n🌍 *Country:* ${user.country}\n\n📊 *Total Players:* ${totalUsers} 📈`;
         await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, { parse_mode: 'Markdown' });
     } catch (error) {}
 
@@ -170,18 +177,17 @@ bot.hears('🎮 Play CheckerX', async (ctx) => {
     ctx.replyWithMarkdown('👇 Click the *Play CheckerX* button at bottom left to play!');
 });
 
-// ✅ UPDATE: Add Total and Verified Referrals to the bot message
+// ✅ UPDATE: Removed ($2+ min) from Referral message
 bot.hears('🔗 Referral', async (ctx) => {
     const userId = String(ctx.from.id);
     const user = await User.findOne({ id: userId });
     if (user && user.isBanned) return;
     
-    // Get stats from database
     const totalRefs = await User.countDocuments({ referredBy: userId });
     const verifiedRefs = await User.countDocuments({ referredBy: userId, firstDepositDone: true });
     
     const botUsername = 'CheckerX_Official_Bot';
-    const msg = `🔗 *REFERRAL PROGRAM*\nInvite friends and earn *10 X Coins ($0.10)* when they make their first successful deposit ($2+ min)!\n\n📊 *Your Stats:*\n👥 Total Referrals: *${totalRefs}*\n🔥 Verified (Deposited): *${verifiedRefs}*\n\n👇 *Your Referral Link:*\n\`https://t.me/${botUsername}?start=ref_${userId}\``;
+    const msg = `🔗 *REFERRAL PROGRAM*\nInvite friends and earn *10 X Coins ($0.10)* when they make their first successful deposit!\n\n📊 *Your Stats:*\n👥 Total Referrals: *${totalRefs}*\n🔥 Verified (Deposited): *${verifiedRefs}*\n\n👇 *Your Referral Link:*\n\`https://t.me/${botUsername}?start=ref_${userId}\``;
     
     ctx.replyWithMarkdown(msg);
 });
@@ -192,7 +198,9 @@ bot.hears('💰 Balance', async (ctx) => {
     const totalMatches = user.wins + user.losses;
     const winRate = totalMatches > 0 ? Math.round((user.wins / totalMatches) * 100) : 0;
     const usdVal = (user.balance / 100).toFixed(2);
-    const balanceMsg = `🏦 *CHECKERX WALLET* 🏦\n━━━━━━━━━━━━━━━━━━\n👤 *User:* ${user.name}\n💰 *Balance:* \`${user.balance.toLocaleString()} X Coins ($${usdVal})\`\n🏆 *Win Rate:* ${winRate}\% (${user.wins}W / ${user.losses}L / ${user.draws || 0}D)\n━━━━━━━━━━━━━━━━━━`;
+    const safeName = escapeMD(user.name);
+
+    const balanceMsg = `🏦 *CHECKERX WALLET* 🏦\n━━━━━━━━━━━━━━━━━━\n👤 *User:* ${safeName}\n💰 *Balance:* \`${user.balance.toLocaleString()} X Coins ($${usdVal})\`\n🏆 *Win Rate:* ${winRate}\% (${user.wins}W / ${user.losses}L / ${user.draws || 0}D)\n━━━━━━━━━━━━━━━━━━`;
     ctx.replyWithMarkdown(balanceMsg);
 });
 
@@ -210,22 +218,14 @@ bot.hears('📥 Deposit', async (ctx) => {
     });
 });
 
+// ✅ UPDATE: Deposit Flow Step 1 (Ask amount only)
 bot.action(/^dep_([a-zA-Z_]+)$/, async (ctx) => {
     const method = ctx.match[1].toUpperCase();
     const userId = String(ctx.from.id);
-    let address = '';
-    
-    if (method === 'BINANCE') {
-        address = 'Binance Pay ID: `68831633`'; 
-    } else if (method === 'USDT' || method === 'TRX') {
-        address = 'TRC20 Wallet Address:\n`TFMcoaR7zC1NV94FBnP5JXBcNg1BbxourK`';
-    } else if (method === 'DGB') {
-        address = 'DGB Wallet Address:\n`DL4wmug1kCrAXA3PRHrAhwvs3wzF53HniH`';
-    }
 
     userStates[userId] = { action: 'deposit', method: method, step: 'awaiting_amount' };
     await ctx.answerCbQuery();
-    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\n1️⃣ *Make your payment to:*\n${address}\n\n2️⃣ *How much are you depositing? (Min $2.00)*\n_(Type the amount below)_`);
+    ctx.replyWithMarkdown(`📥 *${method} DEPOSIT*\n\n👇 *How much are you depositing? (Min $2.00)*\n_(Type the amount below)_`);
 });
 
 bot.hears('📤 Withdrawal', async (ctx) => {
@@ -321,7 +321,7 @@ bot.action('admin_top_refs', async (ctx) => {
             const refId = sortedRefs[i];
             const count = refCounts[refId];
             const refUser = await User.findOne({ id: refId });
-            const name = refUser ? refUser.name : "Unknown";
+            const name = refUser ? escapeMD(refUser.name) : "Unknown";
             msg += `${i + 1}.${name} (\`${refId}\`) - *${count} Refs*\n`;
         }
         msg += `━━━━━━━━━━━━━━`;
@@ -424,7 +424,8 @@ bot.on('message', async (ctx) => {
             }
             u.balance += amount; 
             await u.save();
-            ctx.reply(`✅ *Success!*\nAdded ${amount} X Coins ($${(amount/100).toFixed(2)}) to ${u.name}.\nNew Balance:${u.balance} Coins`, {parse_mode: 'Markdown'});
+            const safeName = escapeMD(u.name);
+            ctx.reply(`✅ *Success!*\nAdded ${amount} X Coins ($${(amount/100).toFixed(2)}) to ${safeName}.\nNew Balance:${u.balance} Coins`, {parse_mode: 'Markdown'});
             bot.telegram.sendMessage(state.targetId, `🎁 *Admin Reward:* You received *${amount} X Coins ($${(amount/100).toFixed(2)})*! 💰`, { parse_mode: 'Markdown' }).catch(e=>{});
             delete userStates[userId];
             return;
@@ -448,7 +449,8 @@ bot.on('message', async (ctx) => {
             }
             u.balance = Math.max(0, u.balance - amount); 
             await u.save();
-            ctx.reply(`✅ *Success!*\nRemoved ${amount} X Coins from ${u.name}.\nNew Balance:${u.balance} Coins`, {parse_mode: 'Markdown'});
+            const safeName = escapeMD(u.name);
+            ctx.reply(`✅ *Success!*\nRemoved ${amount} X Coins from ${safeName}.\nNew Balance:${u.balance} Coins`, {parse_mode: 'Markdown'});
             delete userStates[userId];
             return;
         }
@@ -470,6 +472,7 @@ bot.on('message', async (ctx) => {
         
         if (!state) return;
 
+        // ✅ UPDATE: Deposit Flow Step 2 (Send Address and ask for TxID)
         if (state.action === 'deposit' && state.step === 'awaiting_amount') {
             const amount = parseFloat(text);
             if (isNaN(amount) || amount < 2.0) {
@@ -478,15 +481,25 @@ bot.on('message', async (ctx) => {
             state.amount = amount; 
             state.step = 'awaiting_txid';
             
+            let address = '';
+            if (state.method === 'BINANCE') {
+                address = 'Binance Pay ID: 68831633'; 
+            } else if (state.method === 'USDT' || state.method === 'TRX') {
+                address = 'TRC20 Wallet Address:\nTFMcoaR7zC1NV94FBnP5JXBcNg1BbxourK';
+            } else if (state.method === 'DGB') {
+                address = 'DGB Wallet Address:\nDL4wmug1kCrAXA3PRHrAhwvs3wzF53HniH';
+            }
+
             let idType = state.method === 'BINANCE' ? 'Binance Pay ID / Email' : 'TxID (Transaction Hash)';
             
-            let responseMsg = `✅ Amount saved: <b>$${state.amount}</b> (${state.amount * 100} X Coins)\n\n3️⃣ <b>Now, paste your ${idType} below to verify your payment:</b>\n\n📞 <i>If you have any issues, contact @CheckerX_Admin</i>`;
+            let responseMsg = `✅ Amount saved: <b>$${state.amount}</b> (${state.amount * 100} X Coins)\n\n1️⃣ <b>Make your payment to:</b>\n<code>${address}</code>\n\n2️⃣ <b>Now, paste your ${idType} below to verify your payment:</b>\n\n📞 <i>If you have any issues, contact @CheckerX_Admin</i>`;
             
             return ctx.reply(responseMsg, { parse_mode: 'HTML' });
         }
 
         if (state.action === 'deposit' && state.step === 'awaiting_txid') {
-            const adminMsg = `📥 *NEW DEPOSIT* (${state.method}) 📥\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount} (${state.amount * 100} Coins)\n🔗 *TxID:* \`${text}\``;
+            const safeName = escapeMD(user.name);
+            const adminMsg = `📥 *NEW DEPOSIT* (${state.method}) 📥\n\n👤 *User:* ${safeName}\n🆔 *ID:* \`${user.id}\`\n💸 *Amt:* $${state.amount} (${state.amount * 100} Coins)\n🔗 *TxID:* \`${text}\``;
             
             bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
                 parse_mode: 'Markdown',
@@ -529,7 +542,8 @@ bot.on('message', async (ctx) => {
             await user.save();
             
             const usdVal = (state.amount / 100).toFixed(2);
-            const adminMsg = `📤 *NEW WITHDRAWAL* (${state.method}) 📤\n\n👤 *User:* ${user.name}\n🆔 *ID:* \`${user.id}\`\n💰 *Avail. Bal:* \`${user.balance} Coins ($${(user.balance/100).toFixed(2)})\`\n💸 *Req. Amt:* ${state.amount} Coins ($${usdVal})\n📍 *Addr:* \`${text}\``;
+            const safeName = escapeMD(user.name);
+            const adminMsg = `📤 *NEW WITHDRAWAL* (${state.method}) 📤\n\n👤 *User:* ${safeName}\n🆔 *ID:* \`${user.id}\`\n💰 *Avail. Bal:* \`${user.balance} Coins ($${(user.balance/100).toFixed(2)})\`\n💸 *Req. Amt:* ${state.amount} Coins ($${usdVal})\n📍 *Addr:* \`${text}\``;
             
             bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg, {
                 parse_mode: 'Markdown',
@@ -771,7 +785,9 @@ io.on('connection', (socket) => {
 
             if (loserSocket && loserSocket.userId && winner) {
                 const loserUser = await User.findOne({ id: loserSocket.userId });
-                const logMsg = `🏆 *Match Finished*\n\n🟢 *Winner:* ${winner.name} (\`${winner.id}\`)\n🔴 *Loser:* ${loserUser ? loserUser.name : 'Player'} (\`${loserSocket.userId}\`)\n💰 *Stake:* ${matchStake} Coins\nℹ️ *Reason:* ${reason}`;
+                const safeWinner = escapeMD(winner.name);
+                const safeLoser = loserUser ? escapeMD(loserUser.name) : 'Player';
+                const logMsg = `🏆 *Match Finished*\n\n🟢 *Winner:* ${safeWinner} (\`${winner.id}\`)\n🔴 *Loser:* ${safeLoser} (\`${loserSocket.userId}\`)\n💰 *Stake:* ${matchStake} Coins\nℹ️ *Reason:* ${reason}`;
                 bot.telegram.sendMessage(MATCH_LOG_CHANNEL_ID, logMsg, { parse_mode: 'Markdown' }).catch(e => {});
             }
         } catch (e) { }
@@ -804,7 +820,9 @@ io.on('connection', (socket) => {
                 room.p2.emit('user_synced', { balance: u2.balance, name: u2.name, winRate: Math.round((u2.wins/(u2.wins+u2.losses||1))*100), history: u2.history });
             }
 
-            const logMsg = `🤝 *Match Draw (1v1 Turn Limit)*\n\n👤 *Player 1:* ${u1 ? u1.name : 'Unknown'} (\`${u1 ? u1.id : 'N/A'}\`)\n👤 *Player 2:* ${u2 ? u2.name : 'Unknown'} (\`${u2 ? u2.id : 'N/A'}\`)\n💰 *Stake:* ${matchStake} Coins\nℹ️ *Reason:* 20 moves limit reached. Coins refunded (90%).`;
+            const safeP1 = u1 ? escapeMD(u1.name) : 'Unknown';
+            const safeP2 = u2 ? escapeMD(u2.name) : 'Unknown';
+            const logMsg = `🤝 *Match Draw (1v1 Turn Limit)*\n\n👤 *Player 1:* ${safeP1} (\`${u1 ? u1.id : 'N/A'}\`)\n👤 *Player 2:* ${safeP2} (\`${u2 ? u2.id : 'N/A'}\`)\n💰 *Stake:* ${matchStake} Coins\nℹ️ *Reason:* 20 moves limit reached. Coins refunded (90%).`;
             bot.telegram.sendMessage(MATCH_LOG_CHANNEL_ID, logMsg, { parse_mode: 'Markdown' }).catch(e => {});
 
             room.p1.emit('game_draw', { refund: refundCoins, stake: matchStake });
